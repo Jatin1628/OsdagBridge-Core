@@ -48,6 +48,6 @@ test:
 
 about:
   home: https://github.com/osdagbridge/OsdagBridge-Core
-  license: MIT
+  license: LGPL-3.0-or-later
   license_file: LICENSE
   summary: "Computational, analysis, and design engine for OsdagBridge steel bridges"
