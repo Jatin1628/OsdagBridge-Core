@@ -12,7 +12,7 @@ build:
   number: 0
   script: {{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv
   entry_points:
-    - osdagbridge-cli=osdagbridge.cli.__main__:main
+    - osdagbridge-cli=osdagbridge_core.cli.__main__:main
 
 requirements:
   host:
@@ -40,8 +40,8 @@ requirements:
 
 test:
   imports:
-    - osdagbridge.core
-    - osdagbridge.cli
+    - osdagbridge_core.core
+    - osdagbridge_core.cli
     - ospgrillage
   commands:
     - osdagbridge-cli --help

@@ -1,5 +1,5 @@
 @echo off
-echo Running post-link script for osdagbridge...
+echo Running post-link script for osdagbridge-core...
 
 set "PIP_EXE=%PREFIX%\python.exe -m pip"
 

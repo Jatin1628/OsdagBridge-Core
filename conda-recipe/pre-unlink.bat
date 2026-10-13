@@ -1,5 +1,5 @@
 @echo off
-echo Running pre-unlink script for osdagbridge...
+echo Running pre-unlink script for osdagbridge-core...
 
 %PREFIX%\python.exe -m pip uninstall -y openseespy opsvis
 

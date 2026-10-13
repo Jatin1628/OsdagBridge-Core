@@ -67,7 +67,7 @@ test = [
 
 # Package data
 [tool.setuptools.package-data]
-osdagbridge = [
+osdagbridge_core = [
   "core/data/**/*",
   "core/reports/templates/**/*",
 ]
@@ -84,4 +84,4 @@ where = ["src"]
 
 # Entry points
 [project.scripts]
-osdagbridge-cli = "osdagbridge.cli.__main__:main"
+osdagbridge-cli = "osdagbridge_core.cli.__main__:main"

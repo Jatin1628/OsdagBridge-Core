@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Running pre-unlink script for osdagbridge..."
+echo "Running pre-unlink script for osdagbridge-core..."
 
 "$PREFIX/bin/python" -m pip uninstall -y openseespy opsvis
 

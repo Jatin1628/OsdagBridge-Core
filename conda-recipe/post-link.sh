@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Running post-link script for osdagbridge..."
+echo "Running post-link script for osdagbridge-core..."
 
 PIP_EXE="$PREFIX/bin/python -m pip"
 
