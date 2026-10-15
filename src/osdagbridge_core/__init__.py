@@ -18,6 +18,13 @@ _core_dir = os.path.join(os.path.dirname(__file__), "core")
 if _core_dir not in __path__:
     __path__.append(_core_dir)
 
+# Ensure databases are initialized (prevents missing table warnings and LookupErrors)
+try:
+    from osdagbridge_core.core.data.db_init import ensure_all_databases
+    ensure_all_databases()
+except Exception:
+    pass
+
 # Safe top-level exception export
 from osdagbridge_core.core.exceptions import OsdagError
 
