@@ -40,11 +40,10 @@ requirements:
 
 test:
   imports:
+    - osdagbridge_core
     - osdagbridge_core.core
     - osdagbridge_core.cli
     - ospgrillage
-  commands:
-    - osdagbridge-cli --help
 
 about:
   home: https://github.com/osdagbridge/OsdagBridge-Core
