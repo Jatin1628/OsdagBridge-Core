@@ -1,5 +1,5 @@
 {% set name = "osdagbridge-core" %}
-{% set version = "1.0.0" %}
+{% set version = environ.get('PKG_VERSION', '1.0.0') %}
 
 package:
   name: {{ name|lower }}
@@ -50,3 +50,7 @@ about:
   license: LGPL-3.0-or-later
   license_file: LICENSE
   summary: "Computational, analysis, and design engine for OsdagBridge steel bridges"
+
+extra:
+  recipe-maintainers:
+    - garvit000
