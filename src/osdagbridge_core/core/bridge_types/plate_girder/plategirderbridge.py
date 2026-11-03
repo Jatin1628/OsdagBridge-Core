@@ -684,11 +684,11 @@ class PlateGirderBridge:
         
         bridge_logger.check_cancel()
         bridge_logger.sub_step("Creating ULS and SLS combinations...")
-        self.create_uls_combinations()
+        uls = self.create_uls_combinations()
         
-        self.create_sls_combinations()
+        sls = self.create_sls_combinations()
 
-        self.output_dict[KEY_ALL_LOAD_COMBINATIONS] = self._all_load_combinations()
+        self.output_dict[KEY_ALL_LOAD_COMBINATIONS] = self._all_load_combinations(uls + sls)
 
     def _stage_cad_generation(self):
         # Validate that the CAD parameter DTO can be assembled, but do NOT build
@@ -2436,14 +2436,20 @@ class PlateGirderBridge:
         included = self._combination_keys(lambda k: ".sls." in k)
         return self.grillage_model.create_sls_combinations(included_keys=included)
 
-    def _all_load_combinations(self) -> list:
+    def _all_load_combinations(self, built: list) -> list:
         """
         Every load combination listed in Additional Inputs, for the Generate
         Results table: the IRC 6 defaults as saved by the checkbox list
         (``{"name": "Basic_1 : <expr>", "included", ...}``), then the custom
         combinations (``{"name", "expr", "included"}``).
+
+        When no checkbox list was saved (dialog never opened), the IRC 6 rows
+        come from ``built`` — the ULS/SLS load cases the analyser created.
         """
         combinations = [dict(c) for c in self.input_dict.get(self._LC_SELECTION_KEY) or []]
+        if not combinations:
+            # "BASIC_1: <expr>" -> "BASIC_1 : <expr>" so the table splits label and expression
+            combinations = [{"name": lc.name.replace(": ", " : ", 1), "included": True} for lc in built]
         for c in self.input_dict.get(KEY_LC_COMBINATIONS) or []:
             combinations.append({
                 "name":     c.get("name", ""),
