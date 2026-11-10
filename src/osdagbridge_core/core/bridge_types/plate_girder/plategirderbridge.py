@@ -828,6 +828,14 @@ class PlateGirderBridge:
             
             self.bridge_component_solver()
             self.compute_load_effects_cache()
+            # Permanent Load Summary table (kN/m per girder), worked out in the analyser
+            from osdagbridge_core.core.utils.common import KEY_SD_DL_SW, KEY_SD_DL_DD, KEY_SD_DL_DW, KEY_SD_DL_SIDL, KEY_SD_PERMANENT_DL
+            for i, loads in enumerate(self.grillage_model.permanent_loads_per_girder(), start=1):
+                self.output_dict[f"{KEY_SD_DL_SW}.G{i}"]        = loads["SW"]
+                self.output_dict[f"{KEY_SD_DL_DD}.G{i}"]        = loads["DD"]
+                self.output_dict[f"{KEY_SD_DL_DW}.G{i}"]        = loads["DW"]
+                self.output_dict[f"{KEY_SD_DL_SIDL}.G{i}"]      = loads["SIDL"]
+                self.output_dict[f"{KEY_SD_PERMANENT_DL}.G{i}"] = sum(loads.values())
             for _gi, _vals in (self._deflections_cache or {}).items():
                 _live = _vals.get("live_mm")
                 _total = _vals.get("total_mm")

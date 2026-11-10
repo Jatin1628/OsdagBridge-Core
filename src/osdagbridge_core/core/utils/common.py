@@ -613,9 +613,9 @@ KEY_SD_DEFL_DL_RAW      = "steeldesign.deflection.raw.dl_mm"     # only for repo
 KEY_SD_PERMANENT_DL     = "steeldesign.loads.permanent_dl_kN_m"  # total DL per girder ("<key>.G{i}"), only for report
 KEY_SD_DL_SW            = "steeldesign.loads.sw_kN_m"            # self-weight load per girder ("<key>.G{i}")
 KEY_SD_DL_DC            = "steeldesign.loads.dc_kN_m"            # other steel (bracing + diaphragm), shared
-KEY_SD_DL_DD            = "steeldesign.loads.dd_kN_m"            # deck slab, shared
-KEY_SD_DL_DW            = "steeldesign.loads.dw_kN_m"            # wearing course, shared
-KEY_SD_DL_SIDL          = "steeldesign.loads.sidl_kN_m"         # footpath + barrier + railing + median, shared
+KEY_SD_DL_DD            = "steeldesign.loads.dd_kN_m"            # deck slab per girder ("<key>.G{i}"), by tributary width
+KEY_SD_DL_DW            = "steeldesign.loads.dw_kN_m"            # wearing course per girder ("<key>.G{i}"), by tributary width
+KEY_SD_DL_SIDL          = "steeldesign.loads.sidl_kN_m"         # footpath + barrier + railing + median per girder ("<key>.G{i}"), by tributary width
 
 #-------------- Stiffener Details Sub-Tab --------------------------------------------
 KEY_SD_STIFFENER_DETAILS            = "member_properties.stiffener_details.stiffener_details_cad"

@@ -1669,6 +1669,47 @@ class BridgeGrillageModel:
         self.sidl_combination = SIDL_combined
         return SIDL_combined
 
+    def permanent_loads_per_girder(self) -> list[dict]:
+        """
+        Permanent load on each girder G1..Gn (kN/m), from the dead-load cases built above,
+        for the "Permanent Load Summary" table. Returns [{"SW", "DD", "DW", "SIDL"}, …].
+
+        SW = girder area × 78.5. DD / DW / SIDL by tributary width: a patch load (kN/m²) × its
+        width inside each girder's strip (strip edges halfway to the next girder, outer strips
+        out to the deck edge); a line load (kN/m) is split between the two girders either side
+        of it by lever rule, or goes wholly to the outer girder if it lies beyond it.
+        """
+        zs = sorted(self.model.Mesh_obj.noz)
+        zs = zs[1:-1] if self.edge_dist > 0 else zs      # girder lines G1..Gn, as in create_self_weight_load
+        edges = [-float("inf")] + [(a + b) / 2 for a, b in zip(zs, zs[1:])] + [float("inf")]
+
+        def per_girder(lc):
+            w = [0.0] * len(zs)
+            for lg in (lc.load_groups if lc is not None else []):
+                pts = [p for p in (getattr(lg["load"], f"load_point_{k}", None) for k in range(1, 9)) if p]
+                p_kN = pts[0].p / 1000.0
+                if len(pts) >= 4:   # patch (kN/m²) × its width inside each strip
+                    lo, hi = min(p.z for p in pts), max(p.z for p in pts)
+                    for i in range(len(zs)):
+                        w[i] += p_kN * max(0.0, min(hi, edges[i + 1]) - max(lo, edges[i]))
+                else:               # line (kN/m), lever rule between neighbouring girders
+                    z = min(max(pts[0].z, zs[0]), zs[-1])
+                    i = max(k for k in range(len(zs)) if zs[k] <= z)
+                    t = (z - zs[i]) / (zs[i + 1] - zs[i]) if i + 1 < len(zs) else 0.0
+                    w[i] += p_kN * (1 - t)
+                    if t:
+                        w[i + 1] += p_kN * t
+            return w
+
+        dd, dw = per_girder(self.deck_load_case), per_girder(self.wearing_course_load)
+        sidl = [sum(v) for v in zip(*(per_girder(lc) for lc in (self.footpath_load_case, self.crash_barrier_load_case,
+                                                                self.railing_load_case, self.median_load_case)))]
+        return [{"SW":   girder_self_weight_kN_m(self.girder_props[min(i, len(self.girder_props) - 1)].A),
+                 "DD":   dd[i],
+                 "DW":   dw[i],
+                 "SIDL": sidl[i]}
+                for i in range(len(zs))]
+
     # ============================================================
     #   Live Load
     # ============================================================
