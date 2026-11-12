@@ -1423,6 +1423,7 @@ class EndDiaphragmForces:
                         pair_forces = fallback_pair_forces
 
                 forces_dict["pairs"][pair] = pair_forces
+                forces_dict.setdefault("geometry", {})[pair] = {"diagonal_length_m": round(L_d, 4)}
 
                 # Run Osdag design checks
                 from osdagbridge_core.core.utils.connect import (
@@ -1775,3 +1776,32 @@ class EndDiaphragmForces:
 
         print(sep)
 
+
+def dc_load_kN_m(bridge) -> float:
+    """
+    DC (kN/m) for the "Permanent Load Summary" table: the designed cross bracing + end
+    diaphragm steel, spread evenly over span × girders, so it is the same on every girder.
+    Bracing steel volume (m³) × 78.5 kN/m³ / (span × no. of girders).
+    """
+    from osdagbridge_core.bridge_components.super_structure.plate_girder.geometry import STEEL_UNIT_WEIGHT_kN_m3
+    od, model = bridge.output_dict, bridge.grillage_model
+    n, L = len(model.girder_props), model.L
+
+    area = lambda key, pid: float(od.get(f"{key}.{pid}") or 0.0) / 1e4   # cm² → m²; absent member → 0
+    vol = 0.0
+    # Cross bracing, per girder pair: (no. of frames) × (2 diagonals + top chord + bottom chord)
+    for pair, g in ((od.get("crossbracing_forces_dict") or {}).get("geometry") or {}).items():
+        pid = pair.replace("-", "")
+        vol += g["no_of_cross_bracings"] * (2 * g["diagonal_length_m"] * area(KEY_TD_CB_PROP_A, pid)
+               + g["girder_spacing_m"] * (area(KEY_TD_CB_TOP_CHORD_PROP_A, pid) + area(KEY_TD_CB_BOTTOM_CHORD_PROP_A, pid)))
+    # End diaphragms, one at each support (× 2): a braced frame (2 diagonals + chords) or a beam across the spacing
+    ed_geom = (od.get("end_diaphragm_forces_dict") or {}).get("geometry") or {}
+    s = float(bridge.input_dict[KEY_TS_GIRDER_SPACING])
+    for i in range(1, n):
+        pid = f"G{i}G{i + 1}"
+        L_d = (ed_geom.get(f"G{i}-G{i + 1}") or {}).get("diagonal_length_m")
+        per_end = (2 * L_d * area(KEY_TD_ED_PROP_A, pid)
+                   + s * (area(KEY_TD_ED_TOP_CHORD_PROP_A, pid) + area(KEY_TD_ED_BOTTOM_CHORD_PROP_A, pid))
+                   if L_d else s * area(KEY_TD_ED_PROP_A, pid))
+        vol += 2 * per_end
+    return vol * STEEL_UNIT_WEIGHT_kN_m3 / (L * n)
