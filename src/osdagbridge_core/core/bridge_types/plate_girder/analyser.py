@@ -1042,8 +1042,8 @@ class BridgeGrillageModel:
     def _total_dead_load_kN(self) -> float:
         """
         Total unfactored dead load (kN) used as the seismic mass per
-        IRC:6-2017 Cl.218.5: the ``DL`` combination (self weight, deck,
-        footpath and SIDL) plus the wearing-course (surfacing) case, which
+        IRC:6-2017 Cl.218.5: the ``DL`` combination (self weight, deck and
+        SIDL; the footway load is live load, see _seismic_live_load_kN) plus the wearing-course (surfacing) case, which
         is registered separately as ``DW``.
 
         Derived on demand from the registered load cases — no per-method
@@ -1139,14 +1139,16 @@ class BridgeGrillageModel:
         218.5.2: the total unfactored vehicle weight, without impact, of the
         heaviest Table 6A vehicle case. The vehicle cases exist from stage 4B on,
         so this is available when the seismic loads are built (4E), before the
-        governing LL case is chosen (4F).
+        governing LL case is chosen (4F). The footway live load (Cl.206.1) is
+        added, as it is live load and not part of the DL seismic mass.
         """
-        return max(
+        vehicles_kN = max(
             (sum(self._vehicle_total_weight_kN(self.vehicle_type_map.get(id(v), ''))
                  for v in vehicles)
              for vehicles in self.vehicle_moving_loads_by_case.values()),
             default=0.0,
         )
+        return vehicles_kN + self._load_case_resultant_kN(getattr(self, "footpath_load_case", None))
 
     @staticmethod
     def _spectral_sa_g(soil_type: int, T: float) -> float:
@@ -1605,10 +1607,12 @@ class BridgeGrillageModel:
         if model is None:
             raise ValueError("Model is not available. Create model before adding loads.")
 
+        # The footway load (Cl.206.1) is a live load — IRC:6-2017 Table B.2 /
+        # B.3 row "Carriageway live load ... and Footway live load" — so it is
+        # carried in the LL case (create_governing_ll_load_case), not here.
         _DL_ATTRS = [
             "self_weight_load_case",
             "deck_load_case",
-            "footpath_load_case",
             "sidl_combination",
         ]
 
@@ -2752,6 +2756,14 @@ class BridgeGrillageModel:
         LL = og.create_load_case(name=f"{partial_safety_factor} LL")
         for entry in target_lc_obj.load_groups:
             LL.add_load(entry["load"], load_factor=entry["factor"])
+
+        # Footway live load (Cl.206.1) goes with the carriageway LL so it takes
+        # the live-load factors of Tables B.2 / B.3. Factor 1.0: no impact on
+        # footway loading (Cl.208.4).
+        footpath_lc = getattr(self, "footpath_load_case", None)
+        if footpath_lc is not None:
+            for entry in footpath_lc.load_groups:
+                LL.add_load(entry["load"], load_factor=entry["factor"])
 
         model.add_load_case(LL, load_factor=partial_safety_factor)
         self.ll_load_case = LL
