@@ -3,7 +3,6 @@ import xarray as xr
 # from math import sqrt, pi
 # import openseespy.opensees as ops
 from osdagbridge_core.core.utils.codes.irc6_2017 import IRC6_2017
-from osdagbridge_core.core.utils.codes.keyfile import LANE_REDUCTION_FACTORS
 from osdagbridge_core.core.utils.common import *
 from osdagbridge_core.core.bridge_components.super_structure.plate_girder.geometry import (
     girder_self_weight_kN_m,
@@ -1934,6 +1933,18 @@ class BridgeGrillageModel:
             return IRC6_2017.cl_208_3_impact_factor(self.L, KEY_VEHICLE[1])
         raise ValueError(f"No impact factor defined for vehicle type {vehicle_type!r}")
 
+    @staticmethod
+    def _vehicle_lane_count(vehicle_type):
+        """
+        Number of traffic lanes one vehicle occupies (IRC 6:2017 Table 6 / 6A):
+        Class A takes one lane, Class 70R (wheeled or tracked) two.
+        """
+        if vehicle_type == "ClassA":
+            return 1
+        if vehicle_type in ("Class70R", "Class70RT"):
+            return 2
+        raise ValueError(f"No lane count defined for vehicle type {vehicle_type!r}")
+
     def add_vehicle_load_cases_from_combinations(self, model=None,
                                                  include_70r_wheeled=True,
                                                  include_70r_tracked=True):
@@ -1942,7 +1953,7 @@ class BridgeGrillageModel:
 
         - Creates empty moving load list
         - Uses global coordinates from vehicle combinations
-        - Applies lane factors (alf)
+        - Applies the IRC 6:2017 Cl.205 lane reduction factor (one per case)
         - Applies dynamic load allowance (dla) per vehicle, stored in the load
           case's load_groups so the governing LL case and combinations keep it
         - include_70r_wheeled / include_70r_tracked select which Class 70R
@@ -1955,8 +1966,6 @@ class BridgeGrillageModel:
 
         vehicle_cases = self.vehicle_lane_coordinates(include_70r_wheeled, include_70r_tracked)
 
-        # IRC 6:2017 Cl.204.4 Table 6A — multi-lane live-load reduction factors (keyfile.LANE_REDUCTION_FACTORS).
-        alf = list(LANE_REDUCTION_FACTORS)
         # -------------------------------------------------
         # Reset stores
         # -------------------------------------------------
@@ -1977,13 +1986,18 @@ class BridgeGrillageModel:
             lc = og.create_load_case(name=f"Case{case_num} {vehicle_summary}")
             self.vehicle_moving_loads_by_case[case_num] = []
 
+            # IRC 6:2017 Cl.205 Table 8 — one reduction for the whole case,
+            # from the number of lanes its vehicles load.
+            n_lanes = sum(
+                len(coord_list) * self._vehicle_lane_count(vehicle_type)
+                for vehicle_type, coord_list in combinations.items()
+            )
+            lane_factor = IRC6_2017.cl_205_lane_reduction_factor(n_lanes)
+
             for vehicle_type, coord_list in combinations.items():
                 # IRC 6:2017 Cl.208.2 / 208.3 — impact factor for this vehicle type.
                 dla = 1.0 + self._vehicle_impact_factor(vehicle_type)
-                for i, (x_coord, z_coord) in enumerate(coord_list):
-
-                    # Lane factor resets per vehicle type (alf indexed within coord_list)
-                    lane_factor = alf[i] if alf and i < len(alf) else 1.0
+                for x_coord, z_coord in coord_list:
 
                     vehicle_generator = og.create_load_model(
                         model_type=vehicle_type.upper()
@@ -2360,9 +2374,8 @@ class BridgeGrillageModel:
             return self.sv_load_cases_list
 
         eccentricity_m = abs(placement["eccentricity_mm"]) / 1000.0
-        # IRC 6:2017 Table 6A lane reduction and Cl.208.2 / 208.3 impact, for the
+        # IRC 6:2017 Cl.205 lane reduction and Cl.208.2 / 208.3 impact, for the
         # non-SV carriageway only — same factors as the Table 6A vehicle cases.
-        alf = list(LANE_REDUCTION_FACTORS)
 
         for sv_side, other_side in (("left", "right"), ("right", "left")):
             sv_cw, other_cw = cws[sv_side], cws[other_side]
@@ -2382,6 +2395,10 @@ class BridgeGrillageModel:
                     others.append(("Class70R", (lane_z[lane] + lane_z[lane + 1]) / 2))
                     lane += 2
                 summary = " + ".join(f"{n}x{t}" for t, n in combo.items())
+                # IRC 6:2017 Cl.205 Table 8 — one reduction for these vehicles,
+                # from the number of lanes they load.
+                lane_factor = IRC6_2017.cl_205_lane_reduction_factor(
+                    sum(self._vehicle_lane_count(t) for t, _ in others))
 
                 for sign, label in ((1, "+300"), (-1, "-300")):
                     lc_name = f"SV-{sv_side[0].upper()} {label} | {other_side[0].upper()}: {summary}"
@@ -2391,12 +2408,9 @@ class BridgeGrillageModel:
                     sv.set_global_coord(og.Point(0.0, 0.0, sv_cw.center + sign * eccentricity_m))
                     lc.add_load(load=sv)
                     self.vehicle_type_map[id(sv)] = "SV"
-                    vehicles, count = [sv], {}
+                    vehicles = [sv]
 
                     for vehicle_type, z in others:
-                        i = count.get(vehicle_type, 0)
-                        count[vehicle_type] = i + 1
-                        lane_factor = alf[i] if i < len(alf) else 1.0
                         dla = 1.0 + self._vehicle_impact_factor(vehicle_type)
                         v = og.create_load_model(model_type=vehicle_type.upper()).create()
                         v.set_global_coord(og.Point(0.0, 0.0, z))

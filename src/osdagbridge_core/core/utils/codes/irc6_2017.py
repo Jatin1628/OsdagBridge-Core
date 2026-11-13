@@ -509,7 +509,28 @@ class IRC6_2017:
             'wheel_loads': wheel_loads,
             'fatigue_cycles': fatigue_cycles
         }
-    
+
+    @staticmethod
+    def cl_205_lane_reduction_factor(n_lanes):
+        """
+        Factor on the longitudinal effect (bending moment, shear, torsion) of a
+        live-load case according to IRC:6-2017 Clause 205, Table 8:
+            one or two lanes   - no reduction
+            three lanes        - 10% reduction
+            four or more lanes - 20% reduction
+
+        Parameters:
+            n_lanes (int): number of traffic lanes loaded
+
+        Returns:
+            float: multiplying factor on the live-load effect
+        """
+        if n_lanes <= 2:
+            return 1.0
+        if n_lanes == 3:
+            return 0.9
+        return 0.8
+
     @staticmethod
     def cl_206_1_footway_load():
         """
