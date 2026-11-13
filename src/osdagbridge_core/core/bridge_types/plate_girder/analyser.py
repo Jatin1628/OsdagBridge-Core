@@ -3011,15 +3011,16 @@ class BridgeGrillageModel:
             generated per event (no direction loop).
             Note: accidental event load cases have no model load case; silently omitted.
 
-        SEISMIC_1  … SEISMIC_4  (4 total)
+        SEISMIC_1  … SEISMIC_12  (12 total)
             2 permanent directions  ×  2 conditions (service γ=1.5, construction γ=0.75)
-            Adding    (DL=1.35, Surf=1.75): SEISMIC_1 service, SEISMIC_2 construction
-            Relieving  (DL=1.00, Surf=1.00): SEISMIC_3 service, SEISMIC_4 construction
+            ×  3 IRC 218.4(2) direction combinations (a), (b), (c)
+            Adding    (DL=1.35, Surf=1.75): SEISMIC_1–3 service, SEISMIC_4–6 construction
+            Relieving  (DL=1.00, Surf=1.00): SEISMIC_7–9 service, SEISMIC_10–12 construction
             Wind load accompanying = None for seismic → omitted.
-            EL term = ``seismic_load_case``, the vertical-dominant IRC 218.3
-            combination (c) set by ``create_seismic_load_cases()``.
+            EL term = ``seismic_combo_a`` / ``_b`` / ``_c`` set by
+            ``create_seismic_load_cases()``; the name ends in EL(a), EL(b) or EL(c).
 
-        Total: 13 ULS combinations when all are selected.
+        Total: 21 ULS combinations when all are selected.
 
         Parameters
         ----------
@@ -3078,7 +3079,8 @@ class BridgeGrillageModel:
         counters: dict = {}
         created: list = []
 
-        def _register(prefix, perm_factors, var_factors, seismic_factor=None, label="", key=""):
+        def _register(prefix, perm_factors, var_factors, seismic_factor=None, label="", key="",
+                      seismic_src=None, seismic_tag=""):
             # Skip combinations the user has de-selected. included_keys is None
             # → generate everything (back-compat); an empty/unknown key always
             # passes so a mapping miss can never silently drop a combination.
@@ -3114,11 +3116,12 @@ class BridgeGrillageModel:
                 to_copy.append((src, fac))
 
             if seismic_factor is not None and seismic_factor != 0:
-                src = _lc('seismic')
+                src = seismic_src if seismic_src is not None else _lc('seismic')
                 if src is None:
                     warnings.warn(f"{prefix}_{seq}: seismic load case not available.")
                 else:
-                    terms.append(f"{seismic_factor}{LOAD_ABBR['seismic']}")
+                    tag = f"({seismic_tag})" if seismic_tag else ""
+                    terms.append(f"{seismic_factor}{LOAD_ABBR['seismic']}{tag}")
                     to_copy.append((src, seismic_factor))
 
             if not to_copy:
@@ -3172,18 +3175,24 @@ class BridgeGrillageModel:
                           label=f"DL={dl_f}  {acc}(no lc)  {leading} leading",
                           key=IRC6_2017.ULS_COMBINATION_KEYS.get(('accidental', leading, acc, 'adding'), ""))
 
-        # ── SEISMIC (4 combos: 2 directions × 2 conditions) ──────────────────
+        # ── SEISMIC (12 combos: 2 directions × 2 conditions × 3 EQ combos) ───
         print("\nULS Seismic combinations:")
         var_seis = {vl: γ(vl, 'accompanying', 'seismic') for vl in VARIABLE_LOADS}
+        # IRC 6:2017 Cl.218.4(2) — every direction combination (a), (b), (c)
+        # is checked. Falls back to seismic_load_case if they were not built.
+        seis_dirs = [(tag, getattr(self, f"seismic_combo_{tag}", None)) for tag in ("a", "b", "c")]
+        seis_dirs = [(t, lc) for t, lc in seis_dirs if lc is not None] or [("", None)]
         for direction in DIRECTIONS:
             dl_f   = γ('dead_load', direction, 'seismic')
             surf_f = γ('surfacing',  direction, 'seismic')
             perm   = {'dead_load': dl_f, 'surfacing': surf_f}
             for condition in ['service', 'construction']:
                 el_f = γ('seismic', condition, 'seismic')
-                _register('SEISMIC', perm, var_seis, seismic_factor=el_f,
-                          label=f"DL={dl_f}({direction})  EL={el_f}({condition})",
-                          key=IRC6_2017.ULS_COMBINATION_KEYS.get(('seismic', condition, None, direction), ""))
+                for tag, src in seis_dirs:
+                    _register('SEISMIC', perm, var_seis, seismic_factor=el_f,
+                              seismic_src=src, seismic_tag=tag,
+                              label=f"DL={dl_f}({direction})  EL={el_f}({condition})  EQ ({tag})",
+                              key=IRC6_2017.ULS_COMBINATION_KEYS.get(('seismic', condition, None, direction), ""))
 
         print(f"\nTotal ULS combinations created: {len(created)}")
         self.uls_combinations = created
