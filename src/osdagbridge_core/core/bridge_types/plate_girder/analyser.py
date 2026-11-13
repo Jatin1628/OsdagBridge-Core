@@ -1133,15 +1133,19 @@ class BridgeGrillageModel:
         except (IndexError, ValueError):
             return None
 
-    def _get_governing_ll_kN(self) -> float:
-        """Total unfactored vehicle weight (kN) for the governing live load case."""
-        case_num = self._governing_case_num()
-        if case_num is None:
-            return 0.0
-        vehicles = self.vehicle_moving_loads_by_case.get(case_num, [])
-        return sum(
-            self._vehicle_total_weight_kN(self.vehicle_type_map.get(id(v), ''))
-            for v in vehicles
+    def _seismic_live_load_kN(self) -> float:
+        """
+        Live load (kN) whose 20 % enters the seismic mass — IRC:6-2017 Cl.218.5.1 /
+        218.5.2: the total unfactored vehicle weight, without impact, of the
+        heaviest Table 6A vehicle case. The vehicle cases exist from stage 4B on,
+        so this is available when the seismic loads are built (4E), before the
+        governing LL case is chosen (4F).
+        """
+        return max(
+            (sum(self._vehicle_total_weight_kN(self.vehicle_type_map.get(id(v), ''))
+                 for v in vehicles)
+             for vehicles in self.vehicle_moving_loads_by_case.values()),
+            default=0.0,
         )
 
     @staticmethod
@@ -1184,7 +1188,7 @@ class BridgeGrillageModel:
 
         DL and LL default to model state: total DL is integrated from the
         registered dead-load cases (``_total_dead_load_kN()``) and LL from the
-        governing vehicle case (``_get_governing_ll_kN()``). Explicit
+        heaviest Table 6A vehicle case (``_seismic_live_load_kN()``). Explicit
         ``dead_load_kN`` / ``live_load_kN`` values (the seismic tab's Custom
         mode) override the automatic derivation.
 
@@ -1226,7 +1230,7 @@ class BridgeGrillageModel:
             Custom dead load for seismic force; None → derived from model state.
         live_load_kN : float | None
             Custom live load for seismic force; None → derived from the
-            governing vehicle case.
+            heaviest Table 6A vehicle case.
         partial_safety_factor : float
             ULS load factor for combination cases (IRC Table B.2 seismic: 1.5).
 
@@ -1244,10 +1248,10 @@ class BridgeGrillageModel:
         if dead_load_kN is None:
             dead_load_kN = self._total_dead_load_kN()
         if live_load_kN is None:
-            live_load_kN = self._get_governing_ll_kN()
+            live_load_kN = self._seismic_live_load_kN()
         print(
             f"Seismic inputs: DL={dead_load_kN:.1f} kN  "
-            f"Governing LL={live_load_kN:.1f} kN"
+            f"Seismic LL (heaviest Table 6A case)={live_load_kN:.1f} kN"
         )
 
         # ── 1. Seismic coefficients (IRC:6-2017 Cl.218.5.1) ──
