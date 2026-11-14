@@ -48,6 +48,7 @@ from osdagbridge_core.core.utils.common import (
     KEY_FOOTPATH,
     KEY_LL_IRC_CLASS_SV,
     KEY_LL_IRC_CLASS_A,
+    KEY_LL_IRC_CLASS_FATIGUE,
     KEY_LL_IRC_70R_WHEELED,
     KEY_LL_IRC_70R_TRACKED,
     KEY_BL_IRC_CLASS_SV,
@@ -1557,11 +1558,15 @@ class PlateGirderBridge:
         model.create_moving_vehicle_load_cases()
         bridge_logger.check_cancel()
 
-        model.add_fatigue_vehicle_load_case()
-        bridge_logger.check_cancel()
+        # IRC:6 Cl.204.6 fatigue truck — only when "Class Fatigue" is ticked.
+        if _ticked(KEY_LL_IRC_CLASS_FATIGUE):
+            model.add_fatigue_vehicle_load_case()
+            bridge_logger.check_cancel()
 
-        model.create_moving_fatigue_load_cases()
-        bridge_logger.check_cancel()
+            model.create_moving_fatigue_load_cases()
+            bridge_logger.check_cancel()
+        else:
+            bridge_logger.info("Fatigue vehicle not included (Class Fatigue not ticked).")
 
         sv_flag = self.input_dict.get(KEY_LL_IRC_CLASS_SV)
         if sv_flag is True or str(sv_flag).strip().lower() in ("1", "true", "yes", "checked"):
