@@ -47,6 +47,7 @@ from osdagbridge_core.core.utils.common import (
     KEY_INCLUDE_MEDIAN,
     KEY_FOOTPATH,
     KEY_LL_IRC_CLASS_SV,
+    KEY_LL_IRC_CLASS_A,
     KEY_LL_IRC_70R_WHEELED,
     KEY_LL_IRC_70R_TRACKED,
     KEY_BL_IRC_CLASS_SV,
@@ -1536,9 +1537,20 @@ class PlateGirderBridge:
             return flag is True or str(flag).strip().lower() in ("1", "true", "yes", "checked")
 
         # IRC:6 Table 6A Note (a) — Class 70R wheeled and/or tracked, per UI selection.
+        use_a = _ticked(KEY_LL_IRC_CLASS_A)
+        use_70r = _ticked(KEY_LL_IRC_70R_WHEELED) or _ticked(KEY_LL_IRC_70R_TRACKED)
+        if not use_a and use_70r:
+            bridge_logger.warning(
+                "Class A is not selected — IRC:6-2017 Cl.201.1: bridges designed for "
+                "Class 70R should be checked for Class A as well.")
+        elif not use_a and not use_70r:
+            bridge_logger.warning(
+                "No Class A or Class 70R vehicle selected — no carriageway live "
+                "load case is created.")
         model.add_vehicle_load_cases_from_combinations(
             include_70r_wheeled=_ticked(KEY_LL_IRC_70R_WHEELED),
             include_70r_tracked=_ticked(KEY_LL_IRC_70R_TRACKED),
+            include_class_a=use_a,
         )
         bridge_logger.check_cancel()
 
