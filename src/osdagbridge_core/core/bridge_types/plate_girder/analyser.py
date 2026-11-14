@@ -2671,7 +2671,8 @@ class BridgeGrillageModel:
         model.add_load_case(BL)
         return BL, Fx_total, len(girder_tags)
 
-    def create_governing_ll_load_case(self, dataset, model=None, partial_safety_factor: float = 1.0):
+    def create_governing_ll_load_case(self, dataset, model=None, partial_safety_factor: float = 1.0,
+                                      braking_eccentricity: float | None = None):
         """
         Identify the governing static vehicle load case (max |Mz_i|), create a
         single ``"{partial_safety_factor} LL"`` load case from it, register it with the
@@ -2783,9 +2784,18 @@ class BridgeGrillageModel:
             for entry in footpath_lc.load_groups:
                 LL.add_load(entry["load"], load_factor=entry["factor"])
 
+        # Cl.211 braking from the governing vehicles goes with the LL —
+        # Table B.2/B.3 row 2.1 "Carriageway live load and associated loads
+        # (braking, tractive and centrifugal)" — so it takes the LL factors in
+        # every combination. Factor 1.0: no impact on braking (Cl.211.2 Note).
+        self.governing_ll_name = str(governing_lc)
+        BL = self.create_braking_load_case(model, eccentricity=braking_eccentricity)
+        if BL is not None:
+            for entry in BL.load_groups:
+                LL.add_load(entry["load"], load_factor=entry["factor"])
+
         model.add_load_case(LL, load_factor=partial_safety_factor)
         self.ll_load_case = LL
-        self.governing_ll_name = str(governing_lc)
 
         # Solve ONLY the new LL case. A bare analyze() re-solves every registered
         # case — including all ~50 increments of each moving load — and ospgrillage's
@@ -3272,6 +3282,12 @@ class BridgeGrillageModel:
         for entry in sv_lc.load_groups:
             f = sv_f if entry["load"].name == "Special Vehicle" else ll_f
             combo.add_load(entry["load"], load_factor=float(f) * entry["factor"])
+
+        # SV braking (Cl.211) goes with the SV at the SV factor.
+        sv_bl = getattr(self, "sv_braking_load_case", None)
+        if sv_bl is not None:
+            for entry in sv_bl.load_groups:
+                combo.add_load(entry["load"], load_factor=float(sv_f) * entry["factor"])
 
         model.add_load_case(combo)
         print(f"  Created: {combo.name}")

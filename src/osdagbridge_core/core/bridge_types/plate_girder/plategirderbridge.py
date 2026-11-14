@@ -756,9 +756,6 @@ class PlateGirderBridge:
 
         self.output_dict.update(self.grillage_model.live_load_report_values())
 
-        bridge_logger.sub_step("Creating braking load case...")
-        self.create_braking_load_case()
-
         if getattr(self.grillage_model, "sv_load_cases_list", None):
             self.create_sv_braking_load_case()
 
@@ -2436,6 +2433,7 @@ class PlateGirderBridge:
         return self.grillage_model.create_governing_ll_load_case(
             dataset=dataset,
             partial_safety_factor=partial_safety_factor,
+            braking_eccentricity=self._braking_eccentricity(),
         )
 
     def _reanalyze_with_dedup(self):
