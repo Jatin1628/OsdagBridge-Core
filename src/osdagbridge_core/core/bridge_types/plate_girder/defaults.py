@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import math
 
+from osdagbridge_core.core.bridge_components.super_structure.railing.geometry import rigid_barrier_with_railing_area
 from osdagbridge_core.core.utils.codes.irc5_2015 import IRC5_2015
 from osdagbridge_core.core.utils.codes.keyfile import (
     KEY_CRASH_BARRIER_TYPE,
@@ -18,6 +19,7 @@ from osdagbridge_core.core.utils.common import (
     KEY_MODULE_PLATE_GIRDER, KEY_MODULE,
     KEY_MATERIAL_GIRDER_FY,
     DEFAULT_GIRDER_SPACING,
+    VALUES_FOOTPATH,
     DEFAULT_RAILING_WIDTH,
     KEY_TS_GIRDER_SPACING, KEY_TS_NO_OF_GIRDERS, KEY_TS_DECK_OVERHANG, KEY_TS_OVERALL_WIDTH,
     KEY_TS_NO_OF_FOOTPATHS, KEY_TS_DECK_THICKNESS, KEY_TS_FOOTPATH_WIDTH, KEY_TS_FOOTPATH_THICKNESS,
@@ -198,6 +200,7 @@ def _calc_crossbracing_spacing_and_no(span_m: float) -> tuple[int, float]:
 def _update_typical_section_defaults(input_dict: dict) -> None:
     """Fill Typical Section tab keys that are None with computed/standard defaults."""
     from osdagbridge_core.core.utils.codes.keyfile import KEY_FOOTPATH as KF_FOOTPATH
+    from osdagbridge_core.core.utils.codes.keyfile import KEY_RAILING_TYPE as _RL_KEYS
     from osdagbridge_core.core.bridge_components.super_structure.crash_barrier.geometry import (
         rigid_barrier_no_footpath_area,
     )
@@ -215,23 +218,33 @@ def _update_typical_section_defaults(input_dict: dict) -> None:
     _update(KEY_TS_FOOTPATH_THICKNESS, 250.0)                        # mm
 
     # --- Crash Barrier sub-tab ---
-    _cb_dims = IRC5_2015.cl_109_6_3_shapes(
-        barrier_type=KEY_CRASH_BARRIER_TYPE[2],
-        footpath=KF_FOOTPATH[0],
-        railing_type=None,
-        design_dict={},
-        crash_barrier_type=KEY_RIGID_CRASH_BARRIER_TYPE[0],
+    from osdagbridge_core.bridge_components.super_structure.crash_barrier.properties import (
+        rcc_railing_load,
+        rigid_barrier_no_footpath_load,
     )
-    _cb_area = rigid_barrier_no_footpath_area()
-    _cb_load = rigid_barrier_no_footpath_load()
+    footpath     = input_dict.get(KEY_FOOTPATH, VALUES_FOOTPATH[0])
+    has_footpath = footpath in (VALUES_FOOTPATH[1], VALUES_FOOTPATH[2])
+    if has_footpath:
+        # Since Default is RCC Railing
+        _cb_dims = IRC5_2015.cl_109_6_3_shapes(
+            KEY_CRASH_BARRIER_TYPE[2], footpath, _RL_KEYS[0], {}, KEY_RIGID_CRASH_BARRIER_TYPE[0]
+        )
+        _cb_area = rigid_barrier_with_railing_area("rcc")
+        _cb_load = rcc_railing_load()
+    else:
+        _cb_dims = IRC5_2015.cl_109_6_3_shapes(
+            KEY_CRASH_BARRIER_TYPE[2], VALUES_FOOTPATH[0], None, {}, KEY_RIGID_CRASH_BARRIER_TYPE[0]
+        )
+        _cb_area = rigid_barrier_no_footpath_area()
+        _cb_load = rigid_barrier_no_footpath_load()
 
     _update(KEY_CB_TYPE,         "IRC 5 - RCC Crash Barrier")
-    _update(KEY_CB_DENSITY,      RCC_DENSITY)                          # kN/m³
-    _update(KEY_CB_WIDTH,        _cb_dims[KEY_CB_WIDTH]  / 1e3)        # mm → m
-    _update(KEY_CB_HEIGHT,       _cb_dims[KEY_CB_HEIGHT] / 1e3)        # mm → m
-    _update(KEY_CB_AREA,         _cb_area["barrier_area"])             # mm²
-    _update(KEY_CB_LOAD,         _cb_load["total_load_kN_per_m"])      # kN/m
-    _update(KEY_CB_POST_SPACING, 2)                                    # m
+    _update(KEY_CB_DENSITY,      f"{RCC_DENSITY:.1f}")                          # kN/m³
+    _update(KEY_CB_WIDTH,        f"{_cb_dims[KEY_CB_WIDTH]  / 1e3:.2f}")        # mm → m
+    _update(KEY_CB_HEIGHT,       f"{_cb_dims[KEY_CB_HEIGHT] / 1e3:.2f}")        # mm → m
+    _update(KEY_CB_AREA,         f"{_cb_area["barrier_area"] / 1e6:.3f}")       # mm²
+    _update(KEY_CB_LOAD,         f"{_cb_load["total_load_kN_per_m"]:.2f}")      # kN/m
+    _update(KEY_CB_POST_SPACING, 2)                                             # m
 
     # --- Median sub-tab ---
     from osdagbridge_core.core.bridge_components.super_structure.median.geometry import (
