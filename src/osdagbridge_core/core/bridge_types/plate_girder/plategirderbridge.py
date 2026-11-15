@@ -102,6 +102,8 @@ from osdagbridge_core.core.utils.common import (
     KEY_WC_THICKNESS,
     KEY_LL_ECCENTRICITY,
     KEY_WC_DENSITY,
+    KEY_PL_SELF_WEIGHT_FACTOR,
+    DEFAULT_SELF_WEIGHT_FACTOR,
     KEY_MP_GD_SEGMENT_TABLE, KEY_MP_GIRDER_TYPE, KEY_MP_GIRDER_SYMMETRY, KEY_MP_GIRDER_DEPTH, KEY_MP_GIRDER_WEB_DEPTH, KEY_MP_GIRDER_WEB_THICKNESS,
     KEY_MP_GIRDER_TOP_FLANGE_WIDTH, KEY_MP_GIRDER_TOP_FLANGE_THICKNESS,
     KEY_MP_GIRDER_BOTTOM_FLANGE_WIDTH, KEY_MP_GIRDER_BOTTOM_FLANGE_THICKNESS,
@@ -1499,8 +1501,14 @@ class PlateGirderBridge:
         barrier_load_kN_m = crash_barrier_load_from_inputs(self.input_dict)
         railing_load_kN_m = railing_load_from_inputs(self.input_dict)
 
+        _swf_raw = self.input_dict.get(KEY_PL_SELF_WEIGHT_FACTOR, DEFAULT_SELF_WEIGHT_FACTOR)
+        try:
+            sw_factor = float(_swf_raw) if _swf_raw not in (None, "") else DEFAULT_SELF_WEIGHT_FACTOR
+        except (TypeError, ValueError):
+            sw_factor = DEFAULT_SELF_WEIGHT_FACTOR
+
         model = self.grillage_model
-        model.create_self_weight_load()
+        model.create_self_weight_load(self_weight_factor=sw_factor)
         model.create_deck_load(slab_thickness_m=deck_t_m)
         model.create_wearing_course_load(thickness_m=wc_t_m, density_kN_m3=wc_rho, partial_safety_factor=1.0)
         model.create_footpath_load()

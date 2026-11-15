@@ -381,17 +381,29 @@ class BridgeGrillageModel:
     #   Dead Load
     # ============================================================
 
-    def create_self_weight_load(self, model=None, L=None):
+    def create_self_weight_load(self, model=None, L=None, self_weight_factor: float = 1.0):
         """Creates beam self weight distributed along length.
 
         Magnitude is derived per girder from its own section area (m²) × 78.5
         kN/m³, so each loaded grid line tracks the actual section assigned to it
         rather than a single shared value. When all girders share one section
         this reduces to the previous uniform behaviour.
+
+        ``self_weight_factor`` is the user's self-weight modification factor.
+        It scales the girder weight to cover stiffeners, splices, connections
+        and accessories not modelled (IRC:6-2017 Cl.203: dead load includes the
+        member's own weight and fixed loads carried thereon). It is a quantity
+        correction, not a partial safety factor, so it is applied inside the
+        SW case and therefore flows into DL, all combinations and the
+        unfactored seismic mass (Cl.218.5.1).
         """
         model = model or self.model
         if model is None:
             raise ValueError("Model is not available. Create model before adding loads.")
+
+        self_weight_factor = float(self_weight_factor)
+        if self_weight_factor < 0.0:
+            raise ValueError("self_weight_factor must be non-negative.")
 
         if not self.girder_props:
             raise ValueError(
@@ -426,8 +438,13 @@ class BridgeGrillageModel:
         # iterate through all grillage transverse positions (except extreme edges)
         for z_pos in model.Mesh_obj.noz[1:-1]:
             A_girder_m2 = _area_for_z(z_pos)
-            beam_mag = girder_self_weight_kN_m(A_girder_m2, STEEL_UNIT_WEIGHT_kN_m3) * kN / m  # N/m
-            print(f"Self weight line load @ z={z_pos:.3f} m: {beam_mag:.2f} N/m (A={A_girder_m2:.5f} m²)")
+            beam_mag = (
+                self_weight_factor
+                * girder_self_weight_kN_m(A_girder_m2, STEEL_UNIT_WEIGHT_kN_m3)
+                * kN / m
+            )  # N/m
+            print(f"Self weight line load @ z={z_pos:.3f} m: {beam_mag:.2f} N/m "
+                  f"(A={A_girder_m2:.5f} m², factor={self_weight_factor:.3f})")
             p1 = og.create_load_vertex(x=start_beam, z=z_pos, p=beam_mag)
             p2 = og.create_load_vertex(x=end_beam, z=z_pos, p=beam_mag)
 
