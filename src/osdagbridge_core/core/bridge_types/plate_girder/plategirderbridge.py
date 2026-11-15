@@ -85,7 +85,7 @@ from osdagbridge_core.core.utils.common import (
     KEY_SL_HORIZONTAL_COEFF, KEY_SL_VERTICAL_COEFF,
     KEY_SL_FORCE_LONGITUDINAL, KEY_SL_FORCE_TRANSVERSE,
     KEY_WL_TRANSVERSE_WIND_FORCE, KEY_WL_LONGITUDINAL_WIND_FORCE, KEY_WL_VERTICAL_WIND_FORCE,
-    KEY_MD_WIDTH,
+    KEY_MD_WIDTH, KEY_MD_LOAD,
     KEY_RL_WIDTH,
     KEY_TS_DECK_OVERHANG,
     KEY_TS_DECK_THICKNESS,
@@ -1426,7 +1426,7 @@ class PlateGirderBridge:
         model.create_footpath_load()
         model.create_crash_barrier_load(barrier_load_kN_per_m=barrier_load_kN_m)
         model.create_railing_load(railing_load_kN_per_m=railing_load_kN_m)
-        model.create_median_load()
+        model.create_median_load(median_load_kN_per_m=float(self.input_dict[KEY_MD_LOAD]) if self.input_dict.get(KEY_MD_LOAD) is not None else None)
         model.create_dead_load_combination(partial_safety_factor=1.0)
 
     # ─────────────────────────────────────────────────────────────────────────

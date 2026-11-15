@@ -310,7 +310,7 @@ def crash_barrier_dead_load_kN_m(load_kN_per_m: float | None = None) -> float:
     return load_kN_per_m if load_kN_per_m is not None else DEFAULT_CRASH_BARRIER_LOAD_kN_m
 
 
-_KEY_CRASH_BARRIER_LOAD = "crash_barrier_load"
+_KEY_CRASH_BARRIER_LOAD = KEY_CB_LOAD
 
 
 def crash_barrier_load_from_inputs(additional_inputs: dict) -> float | None:
