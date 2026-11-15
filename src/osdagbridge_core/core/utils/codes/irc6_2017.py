@@ -953,7 +953,8 @@ class IRC6_2017:
             basic_wind_speed (float): basic wind speed V_b in m/s
             
         Returns:
-            float: Transverse wind load per unit length FTL in kN/m (rounded to 3 decimal places)
+            dict: FT_LL / FL_LL — transverse / longitudinal wind load on live load
+            per unit length in N/m (Pz is in N/m²), and the application height (m)
         """
         
         # Wind pressure from Table 12
@@ -964,13 +965,10 @@ class IRC6_2017:
         
         CD = 1.2  # Drag coefficient for parapet
         
-        # Determine if railing or crash barrier is present
-        if KEY_RAILING_TYPE[0] or KEY_CRASH_BARRIER_TYPE[0]:
-            railing_present = True
-        else:
-            railing_present = False
-
-        if railing_present: 
+        # Cl.209.3.6: 3.0 m band above the roadway, less the area below the top
+        # of the barrier. Railing present → its height; otherwise the crash
+        # barrier's (every bridge here has a crash barrier).
+        if railing_height > 0:
             A1 = 3.0 - railing_height   # Area exposed to wind per unit length (m2/m)
         else:
             A1 = 3.0 - crash_barrier_height

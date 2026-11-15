@@ -1413,6 +1413,7 @@ class BridgeGrillageModel:
             b_width: float | None = None,
             d_depth: float | None = None,
             partial_safety_factor: float = 1.0,
+            wind_ll_eccentricity: float = 1.5,
     ) -> dict:
         """
         Creates wind load cases per IRC:6-2017 Cl.209.3.3–209.3.5 and
@@ -1588,6 +1589,31 @@ class BridgeGrillageModel:
             ))
         model.add_load_case(WL_V)
         self.wind_uplift_load_case = WL_V
+
+        # ── Wind on live load — IRC:6-2017 Cl.209.3.6 ────────────────────
+        # FT_LL over the full span + FL_LL = 25% of it, both acting e above the
+        # roadway → nodal Fz / Fx with the couples they make (Mx = Fz·e,
+        # Mz = Fx·e), shared equally between the main girder nodes like braking.
+        # Kept out of the "WL" case: the combination builders add it only when
+        # LL and WL are both present, at the wind factor.
+        wll = IRC6_2017.cl_209_3_6_transverse_wind_load_per_unit(
+            railing_height=railing_height, crash_barrier_height=crash_barrier_height,
+            height_for_pz=height_for_pz, terrain=terrain, basic_wind_speed=basic_wind_speed)
+        FT_LL = wll["FT_LL"] * span      # N
+        FL_LL = wll["FL_LL"] * span      # N
+        tags = [t for t, s in node_spec.items()
+                if any(abs(s["coordinate"][2] - z) <= TOL for z in main_noz)]
+        n, e = len(tags), wind_ll_eccentricity
+        WL_LL = og.create_load_case(name="WL on LL")
+        for t in tags:
+            WL_LL.add_load(og.create_load(
+                loadtype="nodal", node_tag=t,
+                Fx=FL_LL / n, Fy=0, Fz=FT_LL / n,
+                Mx=FT_LL / n * e, My=0, Mz=FL_LL / n * e))
+        model.add_load_case(WL_LL)
+        self.wind_on_ll_load_case = WL_LL
+        print(f"Wind on LL (Cl.209.3.6): FT_LL={FT_LL/1000:.2f} kN  FL_LL={FL_LL/1000:.2f} kN  "
+              f"(e={e:.2f} m) over {n} girder nodes")
 
         # ── 6. WL Combined ────────────────────────────────────────────────
         WL = og.create_load_case(name=f"{partial_safety_factor} WL")
@@ -3195,6 +3221,14 @@ class BridgeGrillageModel:
                 terms.append(f"{fac}{LOAD_ABBR[key]}")
                 to_copy.append((src, fac))
 
+            # Cl.209.3.6 wind on live load: only when LL and WL are both in this
+            # combination; it takes the wind factor.
+            wll = getattr(self, "wind_on_ll_load_case", None)
+            ll_f, wl_f = var_factors.get('live_load'), var_factors.get('wind_load')
+            if (wll is not None and ll_f and wl_f
+                    and _lc('live_load') is not None and _lc('wind_load') is not None):
+                to_copy.append((wll, wl_f))
+
             if seismic_factor is not None and seismic_factor != 0:
                 src = seismic_src if seismic_src is not None else _lc('seismic')
                 if src is None:
@@ -3528,6 +3562,14 @@ class BridgeGrillageModel:
                     continue
                 terms.append(f"{fac}{LOAD_ABBR[key]}")
                 to_copy.append((src, fac))
+
+            # Cl.209.3.6 wind on live load: only when LL and WL are both in this
+            # combination; it takes the wind factor.
+            wll = getattr(self, "wind_on_ll_load_case", None)
+            ll_f, wl_f = var_factors.get('live_load'), var_factors.get('wind_load')
+            if (wll is not None and ll_f and wl_f
+                    and _lc('live_load') is not None and _lc('wind_load') is not None):
+                to_copy.append((wll, wl_f))
 
             if not to_copy:
                 warnings.warn(f"{prefix}_{seq}: no loads added — skipping.")

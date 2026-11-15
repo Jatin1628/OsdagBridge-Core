@@ -89,6 +89,8 @@ from osdagbridge_core.core.utils.common import (
     KEY_SL_HORIZONTAL_COEFF, KEY_SL_VERTICAL_COEFF,
     KEY_SL_FORCE_LONGITUDINAL, KEY_SL_FORCE_TRANSVERSE,
     KEY_WL_TRANSVERSE_WIND_FORCE, KEY_WL_LONGITUDINAL_WIND_FORCE, KEY_WL_VERTICAL_WIND_FORCE,
+    KEY_WL_WIND_LL_ECC_MODE, KEY_WL_WIND_LL_ECC_VALUE,
+    KEY_CB_HEIGHT, KEY_RL_HEIGHT,
     KEY_MD_WIDTH, KEY_MD_LOAD,
     KEY_RL_WIDTH,
     KEY_TS_DECK_OVERHANG,
@@ -1611,8 +1613,12 @@ class PlateGirderBridge:
         terrain       = "plain" if "plain" in terrain_raw.lower() else "obstructed"
 
         # ── Exposed height components ────────────────────────────────────
-        railing_height       = float(ai.get("railing_height")       or 0.0)
-        crash_barrier_height = float(ai.get("crash_barrier_height") or 0.0)
+        # Railing height only when the layout has a railing (KEY_RL_HEIGHT is
+        # defaulted even without one); crash barrier height from Typical Section.
+        layout = self.grillage_model.layout
+        has_railing = any(layout.has_component(f"railing_{s}") for s in ("left", "right"))
+        railing_height       = float(inp.get(KEY_RL_HEIGHT) or 0.0) if has_railing else 0.0
+        crash_barrier_height = float(inp.get(KEY_CB_HEIGHT) or 0.0)
         deck_t_m             = deck_thickness_from_inputs(ai, _DEFAULT_DECK_THICKNESS_MM)
 
         # ── Girder geometry for CD ───────────────────────────────────────
@@ -1623,6 +1629,14 @@ class PlateGirderBridge:
             self._girder_value(KEY_MP_GIRDER_DEPTH, i) for i in range(self._girder_count())
         )
         c_spacing = inp[KEY_TS_GIRDER_SPACING]
+
+        # ── Wind on live load height (Cl.209.3.6: 1.5 m above the roadway) ──
+        wind_ll_ecc = 1.5
+        if str(inp.get(KEY_WL_WIND_LL_ECC_MODE) or "").strip().lower() == "custom":
+            try:
+                wind_ll_ecc = float(inp.get(KEY_WL_WIND_LL_ECC_VALUE))
+            except (TypeError, ValueError):
+                bridge_logger.info("Wind on LL eccentricity is not numeric; using the IRC 1.5 m.")
 
         wind_result = self.grillage_model.create_wind_load(
             railing_height=railing_height,
@@ -1636,6 +1650,7 @@ class PlateGirderBridge:
             c_spacing=c_spacing,
             d_depth=d_depth,
             partial_safety_factor=1.0,
+            wind_ll_eccentricity=wind_ll_ecc,
         )
 
         # Persist the wind forces for the report (Table 3.4).
