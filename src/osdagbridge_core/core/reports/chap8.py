@@ -130,9 +130,9 @@ form the basis of all design calculations in this software.
 
 \begin{itemize}
 \item Dead load densities per IRC 6:2017 Cl.203: structural steel $78.5 \ \text{kN/m}^3$, concrete $25.0 \ \text{kN/m}^3$, bituminous wearing course $24.0 \ \text{kN/m}^3$.
-\item Multi-lane live load reduction factors per IRC 6:2017 Cl.204.4 Table 6A: 1st lane = 1.0, 2nd lane = 0.8, 3rd lane onwards = 0.4.
+\item Reduction in longitudinal live load effects per IRC 6:2017 Cl.205 Table 8, applied to each live load case according to the number of lanes it loads: two lanes or fewer --- no reduction; three lanes --- 10\%; four or more lanes --- 20\%.
 \item Impact factor (dynamic load allowance) computed from span per IRC 6:2017 Cl.208.2/208.3.
-\item Wind load applied as transverse, longitudinal, and vertical components per IRC 6:2017 Cl.209.3.3--209.3.5.
+\item Wind load applied as transverse, longitudinal, and vertical components per IRC 6:2017 Cl.209.3.3--209.3.5. Wind on live load per Cl.209.3.6 (transverse, with 25\% longitudinal, acting 1.5 m above the roadway) is included in combinations that contain both live load and wind load.
 \end{itemize}
 
 \textbf{Serviceability Limits}
