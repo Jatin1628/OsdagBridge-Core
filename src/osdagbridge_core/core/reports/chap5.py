@@ -820,6 +820,22 @@ def ch5_design_checks(checks_data, bridge, chart_paths=None, girder_details=None
     \]
     """
 
+    # Table 5.12 only when the fatigue vehicle was analysed (Class Fatigue
+    # ticked, IRC:6 Cl.204.6); otherwise say so instead of printing zeros.
+    if _fat_cat:
+        t512_section = render_report_table(
+            "Serviceability -- Fatigue Assessment", t512_rows,
+            headers=["girder", r"stress range, $\Delta\sigma$ (MPa)", r"fatigue limit, $f_{fd}$ (MPa)", "utilization ratio", "status"],
+            align=["C", "C", "C", "C", "C"], longtable=True, escape=False) + r"""
+""" + t512_calc_content + r"""
+\noindent\textit{Note: IRC 22 Cl. 605 --- governing of normal and shear fatigue (worst by DCR). Capacity reduction factor $\mu_r$ applied where plate thickness $> 25$ mm.}
+"""
+    else:
+        t512_section = r"""\noindent\textbf{Serviceability -- Fatigue Assessment}
+
+\noindent\textit{Not carried out --- Class Fatigue is not selected, so no fatigue vehicle (IRC:6 Cl.204.6) is applied.}
+"""
+
     # Generate Table 5.13 rows — per-girder design summary, mirroring the Generate
     # Results dialog's resolve_design_results_summary: one row per girder showing
     # the CONTROLLING check (highest DCR among all checks) plus the real load
@@ -1518,7 +1534,10 @@ def ch5_design_checks(checks_data, bridge, chart_paths=None, girder_details=None
         _row522(r"Girder --- LTB (constr.)",      _dcr_row({5})),
         _row522(r"Girder --- Deflection",         _dcr_row({13, 14}, fallback_unit="mm")),
         _row522(r"Girder --- Stress",             _dcr_row({11}, fallback_unit="MPa")),
-        _row522(r"Girder --- Fatigue",            _dcr_row({8, 9}, fallback_unit="MPa")),
+        (_row522(r"Girder --- Fatigue",
+                 (r"Fatigue vehicle (IRC:6 Cl.204.6)",) + _dcr_row({8, 9}, fallback_unit="MPa")[1:])
+         if _fat_cat else
+         _row522_msg(r"Girder --- Fatigue", r"Not checked --- Class Fatigue not selected")),
         _row522(r"Transverse Shear (slab)",       (_lc_short(_dr_sc.get("governing_combination") or "---"), _knm(_ts_vl), _knm(_ts_vrd), _ts_ur_str)),
         _row522(r"Crack Width (slab)",            _crack_cells),
         _row522(r"Deck --- Flexure (sagging)",    _deck_row(KEY_DD_M_ULS_SAG, KEY_DD_MU_BOT, "kN-m/m")),
@@ -1613,12 +1632,7 @@ This section presents all structural design checks performed by OsdagBridge. For
 """ + t511_calc_content + r"""
 
 \vspace{1em}
-""" + render_report_table(
-    "Serviceability -- Fatigue Assessment", t512_rows,
-    headers=["girder", r"stress range, $\Delta\sigma$ (MPa)", r"fatigue limit, $f_{fd}$ (MPa)", "utilization ratio", "status"],
-    align=["C", "C", "C", "C", "C"], longtable=True, escape=False) + r"""
-""" + t512_calc_content + r"""
-\noindent\textit{Note: IRC 22 Cl. 605 --- governing of normal and shear fatigue (worst by DCR). Capacity reduction factor $\mu_r$ applied where plate thickness $> 25$ mm.}
+""" + t512_section + r"""
 
 \vspace{1em}
 \vspace{0.4em}
