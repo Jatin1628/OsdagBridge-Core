@@ -2625,6 +2625,29 @@ class BridgeGrillageModel:
 
         return BL
 
+    def create_sv_other_braking_load_cases(self, model=None, eccentricity: float | None = None):
+        """
+        Median deck: braking (Cl.211) for the Class A / 70R on the carriageway
+        without the SV — 20% of the heaviest vehicle there, built like
+        "Braking Load". One case per governing vehicle type, stored in
+        self.sv_other_braking_cases and used by _build_sv_combination().
+        """
+        model = model or self.model
+        if eccentricity is None:
+            eccentricity = IRC6_2017.cl_211_3_braking_force_location()["height_m"]
+        self.sv_other_braking_cases = {}
+        for vehicles in getattr(self, "sv_vehicles_by_case", {}).values():
+            types = [self.vehicle_type_map.get(id(v), '') for v in vehicles]
+            types = [t for t in types if t and t != "SV"]
+            if not types:
+                continue
+            gov = max(types, key=self._vehicle_total_weight_kN)
+            if gov not in self.sv_other_braking_cases:
+                BL, _, _ = self._build_braking_load_case(
+                    model, f"Braking Load {gov}", self._vehicle_total_weight_kN(gov), eccentricity)
+                self.sv_other_braking_cases[gov] = BL
+        return self.sv_other_braking_cases
+
     def _build_braking_load_case(self, model, name, W_kN, eccentricity):
         """
         Build and register an unfactored braking load case ``name`` for a
@@ -3288,6 +3311,17 @@ class BridgeGrillageModel:
         if sv_bl is not None:
             for entry in sv_bl.load_groups:
                 combo.add_load(entry["load"], load_factor=float(sv_f) * entry["factor"])
+
+        # Median deck: braking of the vehicles on the other carriageway, at the
+        # LL factor like the vehicles themselves (Table B.2/B.3 row 2.1).
+        types = [self.vehicle_type_map.get(id(v), '')
+                 for v in getattr(self, "sv_vehicles_by_case", {}).get(sv_lc.name, [])]
+        types = [t for t in types if t and t != "SV"]
+        other_bl = (getattr(self, "sv_other_braking_cases", {}) or {}).get(
+            max(types, key=self._vehicle_total_weight_kN)) if types else None
+        if other_bl is not None:
+            for entry in other_bl.load_groups:
+                combo.add_load(entry["load"], load_factor=float(ll_f) * entry["factor"])
 
         model.add_load_case(combo)
         print(f"  Created: {combo.name}")

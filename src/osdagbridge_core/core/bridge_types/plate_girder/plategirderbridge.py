@@ -758,6 +758,8 @@ class PlateGirderBridge:
 
         if getattr(self.grillage_model, "sv_load_cases_list", None):
             self.create_sv_braking_load_case()
+            self.grillage_model.create_sv_other_braking_load_cases(
+                eccentricity=self._braking_eccentricity())
 
         bridge_logger.sub_step("Creating DL+LL combination...")
         self.create_dl_ll_combination(dl_factor=1.0, ll_factor=1.0)
