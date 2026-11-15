@@ -1113,6 +1113,13 @@ class BridgeGrillageModel:
             KEY_LL_IMPACT_FACTOR_CLASS_AA_70R: round(
                 1.0 + IRC6_2017.cl_208_3_impact_factor(span_m), 3
             ),
+            KEY_LL_IMPACT_FACTOR_70R_TRACKED: round(
+                1.0 + IRC6_2017.cl_208_3_impact_factor(span_m, KEY_VEHICLE[1]), 3
+            ),
+            # Cl.204.6: the fatigue truck takes 50% of the Cl.208.2 impact
+            KEY_LL_IMPACT_FACTOR_FATIGUE: round(
+                1.0 + 0.5 * IRC6_2017.cl_208_2_impact_factor(span_m), 3
+            ),
             KEY_LL_VEHICLE_TOTAL_LOAD_CLASS_A: round(
                 sum(IRC6_2017.cl_204_1_ClassA_vehicle().get("wheel_loads", [])) / 1000.0, 2
             ),
@@ -2552,6 +2559,7 @@ class BridgeGrillageModel:
             eccentricity = IRC6_2017.cl_211_3_braking_force_location()["height_m"]
 
         self.braking_load_case = None
+        self.braking_vehicle_type = None
 
         # -------------------------------------------------
         # Governing live-load case → its vehicles → heaviest one
@@ -2578,6 +2586,7 @@ class BridgeGrillageModel:
             return None
 
         governing_type = max(vehicle_types, key=self._vehicle_total_weight_kN)
+        self.braking_vehicle_type = governing_type
         W_kN = self._vehicle_total_weight_kN(governing_type)
 
         if W_kN <= 0:
@@ -2690,6 +2699,17 @@ class BridgeGrillageModel:
                     model, f"Braking Load {gov}", self._vehicle_total_weight_kN(gov), eccentricity)
                 self.sv_other_braking_cases[gov] = BL
         return self.sv_other_braking_cases
+
+    def braked_vehicle_types(self) -> list:
+        """
+        Vehicle types whose Cl.211 braking enters a combination: the heaviest
+        vehicle of the governing LL case, plus (median decks) the heaviest one
+        on the carriageway beside the SV. Used by the report.
+        """
+        types = set(getattr(self, "sv_other_braking_cases", {}) or {})
+        if getattr(self, "braking_vehicle_type", None):
+            types.add(self.braking_vehicle_type)
+        return sorted(types)
 
     def _build_braking_load_case(self, model, name, W_kN, eccentricity):
         """

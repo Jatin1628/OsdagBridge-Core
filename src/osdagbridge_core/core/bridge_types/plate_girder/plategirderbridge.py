@@ -91,6 +91,7 @@ from osdagbridge_core.core.utils.common import (
     KEY_WL_TRANSVERSE_WIND_FORCE, KEY_WL_LONGITUDINAL_WIND_FORCE, KEY_WL_VERTICAL_WIND_FORCE,
     KEY_WL_WIND_LL_ECC_MODE, KEY_WL_WIND_LL_ECC_VALUE,
     KEY_CB_HEIGHT, KEY_RL_HEIGHT,
+    KEY_LL_BRAKING_VEHICLES,
     KEY_MD_WIDTH, KEY_MD_LOAD,
     KEY_RL_WIDTH,
     KEY_TS_DECK_OVERHANG,
@@ -766,6 +767,9 @@ class PlateGirderBridge:
             self.create_sv_braking_load_case()
             self.grillage_model.create_sv_other_braking_load_cases(
                 eccentricity=self._braking_eccentricity())
+
+        # Vehicle types whose braking is applied — read by the Ch 3 vehicle table.
+        self.output_dict[KEY_LL_BRAKING_VEHICLES] = self.grillage_model.braked_vehicle_types()
 
         bridge_logger.sub_step("Creating DL+LL combination...")
         self.create_dl_ll_combination(dl_factor=1.0, ll_factor=1.0)

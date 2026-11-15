@@ -58,6 +58,9 @@ from osdagbridge_core.core.utils.common import (
     KEY_WL_VERTICAL_WIND_FORCE, 
     KEY_LL_IMPACT_FACTOR_CLASS_A,
     KEY_LL_IMPACT_FACTOR_CLASS_AA_70R,
+    KEY_LL_IMPACT_FACTOR_70R_TRACKED,
+    KEY_LL_IMPACT_FACTOR_FATIGUE,
+    KEY_LL_BRAKING_VEHICLES,
     KEY_LL_VEHICLE_TOTAL_LOAD_CLASS_A,
     KEY_LL_VEHICLE_TOTAL_LOAD_70R_WHEELED,
     KEY_LL_VEHICLE_TOTAL_LOAD_70R_TRACKED,
@@ -174,17 +177,27 @@ def ch3_loads(input_dict, output_dict=None):
     def _vehicle_impact(kind):
         if kind == "class_a":
             value = output_dict.get(KEY_LL_IMPACT_FACTOR_CLASS_A)
-        elif kind in ("70r_wheeled", "70r_tracked", "aa_wheeled", "aa_tracked", "fatigue"):
+        elif kind == "70r_tracked":
+            value = output_dict.get(KEY_LL_IMPACT_FACTOR_70R_TRACKED)
+        elif kind == "fatigue":
+            value = output_dict.get(KEY_LL_IMPACT_FACTOR_FATIGUE)
+        elif kind in ("70r_wheeled", "aa_wheeled", "aa_tracked"):
             value = output_dict.get(KEY_LL_IMPACT_FACTOR_CLASS_AA_70R)
         else:
             value = None
         return f"{float(value):.3f}" if value not in (None, "", "N/A") else "N/A"
 
     brk_ecc_table = brk_ecc_str if brk_ecc_str != "N/A" else (_render_value(output_dict, KEY_LL_ECCENTRICITY, " m") or "1.2 m")
+    # Vehicle types whose braking the analysis applied (governing LL case, plus
+    # the carriageway beside the SV on median decks); None for older results.
+    _braked = output_dict.get(KEY_LL_BRAKING_VEHICLES)
+    _kind_to_type = {"class_a": "ClassA", "70r_wheeled": "Class70R", "70r_tracked": "Class70RT"}
     vehicle_rows = []
     for name, key, kind in vehicle_defs:
         if _checked(output_dict, key):
             braking_considered = "Yes"
+            if kind in _kind_to_type and _braked is not None and key != KEY_LL_IRC_70R_BOGIE:
+                braking_considered = "Yes" if _kind_to_type[kind] in _braked else "No"
             if kind == "sv":
                 braking_considered = "Yes" if _checked(output_dict, KEY_BL_IRC_CLASS_SV) else "No"
             if kind == "fatigue":
