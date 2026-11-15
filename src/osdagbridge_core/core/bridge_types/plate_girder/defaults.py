@@ -259,17 +259,18 @@ def _update_typical_section_defaults(input_dict: dict) -> None:
             design_dict={},
             crash_barrier_type=None,
         )
-        _md_area_result = median_rcc_crash_barrier_area()
-        _md_area    = _md_area_result["total_area"]              # mm²
-        _md_load    = (_md_area / 1e6) * RCC_DENSITY             # kN/m
-        _md_height  = (_md_geom["barrier_height"] + _md_geom["kerb_height"]) / 1e3  # mm → m
+        from osdagbridge_core.core.bridge_components.super_structure.median.properties import (
+            median_rcc_barrier_load,
+        )
+        _md_area = median_rcc_crash_barrier_area()
+        _md_load = median_rcc_barrier_load()
         _update(KEY_MD_TYPE,         "IRC 5 - RCC Crash Barrier")
-        _update(KEY_MD_DENSITY,      RCC_DENSITY)                   # kN/m³
-        _update(KEY_MD_WIDTH,        _md_geom[KEY_MD_WIDTH] / 1e3)  # mm → m
-        _update(KEY_MD_HEIGHT,       _md_height)                    # m
-        _update(KEY_MD_AREA,         _md_area)                      # mm²
-        _update(KEY_MD_LOAD,         _md_load)                      # kN/m
-        _update(KEY_MD_POST_SPACING, 2)                             # m
+        _update(KEY_MD_DENSITY,      f"{RCC_DENSITY:.1f}")                              # kN/m³
+        _update(KEY_MD_WIDTH,        f"{_md_geom[KEY_MD_WIDTH] / 1e3:.2f}")             # mm → m
+        _update(KEY_MD_HEIGHT,       f"{_md_geom['barrier_height'] / 1e3:.2f}")         # mm → m
+        _update(KEY_MD_AREA,         f"{_md_area['total_area'] / 1e6:.3f}")             # mm² → m²
+        _update(KEY_MD_LOAD,         f"{_md_load['total_load_kN_per_m']:.2f}")          # kN/m
+        _update(KEY_MD_POST_SPACING, 2)                                                 # m
     else:
         _update(KEY_MD_TYPE,         None)
         _update(KEY_MD_DENSITY,      None)
