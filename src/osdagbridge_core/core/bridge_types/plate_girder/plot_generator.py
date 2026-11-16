@@ -1737,6 +1737,7 @@ def _render_report_figure(fig, show_max: bool, show_min: bool):
     _log = logging.getLogger(__name__)
     try:
         for ax in fig.axes:
+            ax.title.set_visible(False)
             for artist in list(ax.lines) + list(ax.texts):
                 gid = artist.get_gid()
                 if gid == "max_line":
