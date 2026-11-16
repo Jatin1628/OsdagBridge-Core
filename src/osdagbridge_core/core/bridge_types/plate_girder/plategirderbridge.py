@@ -433,6 +433,8 @@ class PlateGirderBridge:
             The flat dictionary built and maintained by ``CustomWindow``.
         """
         self.input_dict = self._normalize_input_dict(input_dict)
+        # IRC:6-2017 Cl.201.1 / Table 6: Class A is always considered.
+        self.input_dict[KEY_LL_IRC_CLASS_A] = True
         self.basic_inputs = {
             k: v for k, v in self.input_dict.items()
             if k in self._BASIC_INPUT_KEYS
@@ -1546,21 +1548,12 @@ class PlateGirderBridge:
             flag = self.input_dict.get(key, True)
             return flag is True or str(flag).strip().lower() in ("1", "true", "yes", "checked")
 
-        # IRC:6 Table 6A Note (a) — Class 70R wheeled and/or tracked, per UI selection.
-        use_a = _ticked(KEY_LL_IRC_CLASS_A)
-        use_70r = _ticked(KEY_LL_IRC_70R_WHEELED) or _ticked(KEY_LL_IRC_70R_TRACKED)
-        if not use_a and use_70r:
-            bridge_logger.warning(
-                "Class A is not selected — IRC:6-2017 Cl.201.1: bridges designed for "
-                "Class 70R should be checked for Class A as well.")
-        elif not use_a and not use_70r:
-            bridge_logger.warning(
-                "No Class A or Class 70R vehicle selected — no carriageway live "
-                "load case is created.")
+        # IRC:6 Table 6A Note (a) — Class 70R wheeled and/or tracked, per UI
+        # selection. Class A is always included (IRC:6-2017 Cl.201.1, Table 6).
         model.add_vehicle_load_cases_from_combinations(
             include_70r_wheeled=_ticked(KEY_LL_IRC_70R_WHEELED),
             include_70r_tracked=_ticked(KEY_LL_IRC_70R_TRACKED),
-            include_class_a=use_a,
+            include_class_a=True,
         )
         bridge_logger.check_cancel()
 

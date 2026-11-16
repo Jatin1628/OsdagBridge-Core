@@ -490,7 +490,8 @@ _LIVE_LOAD_TAB_SCHEMA = {
                             "id": KEY_LL_IRC_CLASS_A,
                             "label": "Class A",
                             "type": TYPE_CHECKBOX,
-                            "label_first": True
+                            "label_first": True,
+                            "default_checked": True,
                         }]
                 },
                 {
