@@ -199,7 +199,8 @@ def _girder_tables(input_dict, n_girders):
          _render_value(input_dict, f"{KEY_MP_GIRDER_TORSIONAL_RESTRAINT}.G{i}.M1") + ', '
          + _render_value(input_dict, f"{KEY_MP_GIRDER_WARPING_RESTRAINT}.G{i}.M1"),
          _render_value(input_dict, f"{KEY_MP_GIRDER_WEB_TYPE}.G{i}.M1"),
-         _render_value(input_dict, f"{KEY_MP_STIFFENER_INTERMEDIATE}.G{i}.M1") + '; Spacing: '
+         "No" if str(input_dict.get(f"{KEY_MP_STIFFENER_INTERMEDIATE}.G{i}.M1", "")).strip().lower() == "no"
+         else _render_value(input_dict, f"{KEY_MP_STIFFENER_INTERMEDIATE}.G{i}.M1") + '; Spacing: '
          + _render_value(input_dict, f"{KEY_MP_STIFFENER_INTERMEDIATE_SPACING}.G{i}.M1", ' mm')
          + '; Thickness: ' + _render_value(input_dict, f"{KEY_MP_STIFFENER_INTERMEDIATE_THICKNESS}.G{i}.M1", ' mm'),
          _render_value(input_dict, f"{KEY_MP_STIFFENER_LONGITUDINAL}.G{i}.M1"),
@@ -234,7 +235,7 @@ def _girder_tables(input_dict, n_girders):
 \vspace{4pt}
 """ + render_report_table("Girder Restraint and Stiffener Details", rst_rows,
     headers=["Girder", "Torsional / Warping Restraint", "Web Philosophy",
-             "Intermediate Stiffeners", "Longitudinal Stiffeners", "Bearing Stiffener"],
+             r"Inter\-mediate Stiffeners", r"Longi\-tudinal Stiffeners", "Bearing Stiffener"],
     longtable=True, escape=False) + r"""
 """)
 
