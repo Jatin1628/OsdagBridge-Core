@@ -360,6 +360,14 @@ def _table_layout(headers, rows, widths=None, align=None):
     return ncols, widths, align
 
 
+def _longtable_continuation(header, ncols):
+    """Repeat headers and show continuation notices only at page breaks."""
+    return (f"\\multicolumn{{{ncols}}}{{l}}{{\\small\\itshape Continued from previous page}}\\\\\n"
+            + header + "\\endhead\n"
+            + f"\\multicolumn{{{ncols}}}{{r}}{{\\small\\itshape Continued on next page...}}\\\\\n"
+            + "\\endfoot\n\\endlastfoot\n")
+
+
 def render_report_table(caption, rows, headers=None, widths=None, align=None, longtable=False, escape=True, header_rows=None, header_clines=None, body_latex=None):
     headers = headers or []
     ncols, widths, align = _table_layout(headers, rows, widths, align)
@@ -392,7 +400,8 @@ def render_report_table(caption, rows, headers=None, widths=None, align=None, lo
     body = body_latex if body_latex is not None else "\n".join(" & ".join(fmt(cell) for cell in row) + r" \\" + "\n\\hline" for row in rows)
 
     if longtable:
-        repeat = (header + "\\endfirsthead\n" + header + "\\endhead\n") if header else "\\hline\n"
+        first_head = header or "\\hline\n"
+        repeat = first_head + "\\endfirsthead\n" + _longtable_continuation(header, ncols)
         return ("\\begin{longtable}{" + colspec + "}\n"
                 + "\\captionsetup{justification=centering,font={small,it}}\n\\caption{"
                 + _tex(caption) + "}\\\\\n" + repeat + body
@@ -453,8 +462,7 @@ def render_analysis_demands_table(body_latex):
 \captionsetup{justification=centering,font={small,it}}
 \caption{Summary of Maximum Demands}\\
 """ + header + r"""\endfirsthead
-""" + header + r"""\endhead
-""" + body_latex + r"""
+""" + _longtable_continuation(header, 9) + body_latex + r"""
 \hline
 \end{longtable}
 \endgroup
