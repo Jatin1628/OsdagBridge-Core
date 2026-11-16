@@ -164,29 +164,24 @@ def executive_summary(input_dict, output_dict, fig_paths) -> str:
     else:
         overall_design_status = "Pass"
 
-    # Overall Utilization Ratio: maximum UR across all bridge components,
-    # tagged with the governing component (e.g. "1.05 (Deck slab)").
-    component_urs = []                  # (ur_value, component_label)
-    if girder_max_ur is not None:
-        component_urs.append((girder_max_ur, "Girder"))
-    deck_max = _max_float([v for k, v in deck_results.items() if str(k).startswith("ur_")])
-    if deck_max is not None:
-        component_urs.append((deck_max, "Deck slab"))
-    for results, label in ((cb_results, "Cross bracing"), (ed_results, "End diaphragm")):
-        m = _max_member_efficiency(results)
-        if m is not None:
-            component_urs.append((m, label))
-    if component_urs:
-        max_ur, max_label = max(component_urs, key=lambda t: t[0])
-        overall_utilization_ratio = f"{max_ur:.2f} ({max_label})"
-    else:
-        overall_utilization_ratio = ""
+    # Use the same result for the overall check name and utilization ratio.
+    _cb_ur, _cb_check = _governing_member(cb_results)
+    _ed_ur, _ed_check = _governing_member(ed_results)
+    _dk_ur, _dk_check = _deck_governing(deck_results)
 
-    gov_raw = str(gov_name).strip() if gov_name not in (None, '', 'None') else ''
-    gov = _tex(gov_raw) if gov_raw else ''
-    ur = _tex(overall_utilization_ratio) if overall_utilization_ratio else ''
-    gov_table = (r"\makecell[c]{" + r"\\".join(_tex(p) for p in gov_raw.replace(".", ". ").replace(":", ": ").split()) + "}"
-                 if gov_raw else '')
+    component_checks = [
+        (girder_max_ur, "Girder", gov_name),
+        (_dk_ur, "Deck slab", _dk_check),
+        (_cb_ur, "Cross bracing", _cb_check),
+        (_ed_ur, "End diaphragm", _ed_check),
+    ]
+    max_ur, component, check = max(
+        (entry for entry in component_checks if entry[0] is not None),
+        key=lambda entry: entry[0],
+        default=(None, "", ""),
+    )
+    gov = _tex(f"{component}: {check}" if check else component)
+    ur = _tex(f"{max_ur:.2f} ({component})") if max_ur is not None else ""
 
     # --- Dynamic Table 1: fetch backend-populated labels via exact suffix pattern ---
     # defaults.py populates: KEY_MP_GD_SELECT_GIRDER + '.G{i}' = 'G{i}'
@@ -234,11 +229,20 @@ def executive_summary(input_dict, output_dict, fig_paths) -> str:
               + urs + '\n'
               r'\hline' + '\n'
               r'\end{tabular}')
+
+    gov_text = f"{component}: {check}" if check else component
+    gov_e2 = " ".join(
+        rf"{{\sbox{{0}}{{{_tex(word)}}}\ifdim\wd0>\linewidth\relax "
+        + r"\allowbreak{}".join(_tex(char) for char in word)
+        + rf"\else {_tex(word)}\fi}}"
+        for word in gov_text.split()
+    )
+
     table1 = render_report_table(
         "Final Bridge Geometry (after optimization)",
         [["Member ID"] + [mid for _, mid in labels],
          ["Section Designation"] + [sec] * n_cols,
-         [r"Govern-\linebreak{}ing\linebreak{}Check"] + [gov_table] * n_cols,
+        [r"Govern-\linebreak{}ing\linebreak{}Check"] + [gov_e2] * n_cols,
          [r"Utiliza-\linebreak{}tion Ratio"] + [ur] * n_cols],
         headers=[""] + [lbl for lbl, _ in labels],
         widths=[1.6] + [1.25] * n_cols,
@@ -255,10 +259,6 @@ def executive_summary(input_dict, output_dict, fig_paths) -> str:
             ur_cell = f"{ur:.2f}"
             status_cell = r"\textcolor{red}{Fail}" if is_fail else "Pass"
         return [component, chk_cell, ur_cell, status_cell]
-
-    _cb_ur, _cb_check = _governing_member(cb_results)
-    _ed_ur, _ed_check = _governing_member(ed_results)
-    _dk_ur, _dk_check = _deck_governing(deck_results)
 
     overview_table = render_report_table(
         "Project Overview",
