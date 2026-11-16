@@ -61,6 +61,7 @@ from osdagbridge_core.core.utils.common import (
     KEY_LL_IMPACT_FACTOR_70R_TRACKED,
     KEY_LL_IMPACT_FACTOR_FATIGUE,
     KEY_LL_BRAKING_VEHICLES,
+    KEY_CARRIAGEWAY_WIDTH,
     KEY_LL_VEHICLE_TOTAL_LOAD_CLASS_A,
     KEY_LL_VEHICLE_TOTAL_LOAD_70R_WHEELED,
     KEY_LL_VEHICLE_TOTAL_LOAD_70R_TRACKED,
@@ -193,7 +194,16 @@ def ch3_loads(input_dict, output_dict=None):
     _braked = output_dict.get(KEY_LL_BRAKING_VEHICLES)
     _kind_to_type = {"class_a": "ClassA", "70r_wheeled": "Class70R", "70r_tracked": "Class70RT"}
     vehicle_rows = []
+    # IRC:6-2017 Cl.204.1 Note 4: Class 70R only on carriageways of 5.3 m and
+    # above — the analysis builds no 70R case below that, so those rows are left out.
+    try:
+        _cw = float(output_dict.get(KEY_CARRIAGEWAY_WIDTH) or 0.0)
+    except (TypeError, ValueError):
+        _cw = 0.0
+    _no_70r = 0.0 < _cw < 5.3
     for name, key, kind in vehicle_defs:
+        if _no_70r and key in (KEY_LL_IRC_70R_WHEELED, KEY_LL_IRC_70R_TRACKED):
+            continue
         if _checked(output_dict, key):
             braking_considered = "Yes"
             if kind in _kind_to_type and _braked is not None and key != KEY_LL_IRC_70R_BOGIE:
