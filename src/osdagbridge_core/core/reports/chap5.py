@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from osdagbridge_core.core.utils.common import (
+    KEY_MP_STIFFENER_INTERMEDIATE,
     KEY_MP_STIFFENER_INTERMEDIATE_THICKNESS,
     KEY_MP_STIFFENER_DESIGN_METHOD,
     KEY_MP_STIFFENER_INTERMEDIATE_SPACING,
@@ -104,6 +105,17 @@ from osdagbridge_core.core.utils.common import (
     KEY_MATERIAL_GIRDER_E,
     KEY_MATERIAL_GIRDER_G,
     KEY_MP_ED_TYPE,
+    KEY_MP_ED_BRACING_CONNECTION,
+    KEY_MP_ED_BRACING_SECTION_DESIGNATION,
+    KEY_MP_ED_TOP_CHORD_SECTION_DESIG,
+    KEY_MP_ED_BOTTOM_CHORD_SECTION_DESIG,
+    KEY_MP_ED_IS_SECTION,
+    KEY_TD_ED_PROP_A,
+    KEY_TD_ED_PROP_RV,
+    KEY_TD_ED_TOP_CHORD_PROP_A,
+    KEY_TD_ED_TOP_CHORD_PROP_RV,
+    KEY_TD_ED_BOTTOM_CHORD_PROP_A,
+    KEY_TD_ED_BOTTOM_CHORD_PROP_RV,
     KEY_SD_BOTTOM_FLANGE_THICKNESS,
     KEY_SD_BOTTOM_FLANGE_WIDTH,
     KEY_SD_BS_FCD,
@@ -172,7 +184,6 @@ from osdagbridge_core.core.utils.common import (
     KEY_SD_SHEAR_VCR,
     KEY_SD_SHEAR_VU,
     KEY_SD_STIFF_END_COUNT,
-    KEY_SD_STIFF_END_THICK,
     KEY_SD_STIFF_INT_SPACING,
     KEY_SD_STIFF_INT_THICK,
     KEY_SD_STIFF_LONG,
@@ -206,7 +217,7 @@ from osdagbridge_core.core.reports.report_utils import (
     stored_classification_details, stored_ltb_properties,
     render_report_table, render_grouped_report_table, _fig_embed, iter_girder_outputs
 )
-
+from osdagbridge_core.bridge_types.plate_girder.results_data import _extract_osdag_summary
 if TYPE_CHECKING:
     pass
 def ch5_design_checks(checks_data, bridge, chart_paths=None, girder_details=None) -> str:
@@ -460,13 +471,17 @@ def ch5_design_checks(checks_data, bridge, chart_paths=None, girder_details=None
     # Generate Table 5.7 rows
     _is_custom = str(bridge.input_dict.get(KEY_DESIGN_MODE, "Optimized")).strip().lower() in {"custom", "customized"}
     t57_groups = []
+    intermediate_disabled = set()
     for lbl, girder_output in iter_girder_outputs(bridge.output_dict, girder_entries):
+        girder = girder_output["_report_girder"]
+        intermediate = bridge.input_dict.get(f"{KEY_MP_STIFFENER_INTERMEDIATE}.{girder}.M1", "")
+        if _is_custom and str(intermediate).strip().lower() == "no":
+            intermediate_disabled.add(girder)
         if _is_custom:
             for target, source in (
                 (KEY_SD_STIFF_METHOD, KEY_MP_STIFFENER_DESIGN_METHOD),
                 (KEY_SD_STIFF_INT_THICK, KEY_MP_STIFFENER_INTERMEDIATE_THICKNESS),
                 (KEY_SD_STIFF_INT_SPACING, KEY_MP_STIFFENER_INTERMEDIATE_SPACING),
-                (KEY_SD_STIFF_END_THICK, KEY_MP_STIFFENER_BEARING_THICKNESS),
                 (KEY_SD_STIFF_END_COUNT, KEY_MP_STIFFENER_NO_BEARING_STIFFENERS),
                 (KEY_SD_STIFF_LONG, KEY_MP_STIFFENER_LONGITUDINAL),
             ):
@@ -474,9 +489,9 @@ def ch5_design_checks(checks_data, bridge, chart_paths=None, girder_details=None
                     girder_output.setdefault(target, girder_output[source])
         t57_items = [
             ["Shear Buckling Design Method", str(_render_value(girder_output, KEY_SD_STIFF_METHOD)).replace("_", " ").title()],
-            ["Intermediate Stiffener Thickness (mm)", _render_value(girder_output, KEY_SD_STIFF_INT_THICK)],
-            ["Intermediate Stiffener Spacing (mm)", _render_value(girder_output, KEY_SD_STIFF_INT_SPACING)],
-            ["Bearing Stiffener Thickness (mm)", _render_value(girder_output, KEY_SD_STIFF_END_THICK)],
+            ["Intermediate Stiffener Thickness (mm)", "N/A" if girder in intermediate_disabled else _render_value(girder_output, KEY_SD_STIFF_INT_THICK)],
+            ["Intermediate Stiffener Spacing (mm)", "N/A" if girder in intermediate_disabled else _render_value(girder_output, KEY_SD_STIFF_INT_SPACING)],
+            ["Bearing Stiffener Thickness (mm)", _render_value(girder_output, KEY_MP_STIFFENER_BEARING_THICKNESS)],
             ["No. of Bearing Stiffeners (per face of web)", _render_value(girder_output, KEY_SD_STIFF_END_COUNT)],
             ["Longitudinal Stiffeners", _render_value(girder_output, KEY_SD_STIFF_LONG)],
         ]
@@ -499,6 +514,8 @@ def ch5_design_checks(checks_data, bridge, chart_paths=None, girder_details=None
 
     t58_groups = []
     for lbl, girder_output in stiffener_outputs:
+        if girder_output["_report_girder"] in intermediate_disabled:
+            continue
         details = girder_details.get(girder_output["_report_girder"], {})
         if KEY_SD_IS_FQ in details and KEY_SD_IS_FQD in details:
             girder_output = {**girder_output, KEY_SD_IS_FQ: details[KEY_SD_IS_FQ],
@@ -520,7 +537,7 @@ def ch5_design_checks(checks_data, bridge, chart_paths=None, girder_details=None
     # has data when the user supplied stiffener sizes (Design Type = Custom). In
     # Optimized mode the stiffeners are auto-sized (nothing to verify), so the
     # whole table is omitted from the report.
-    if _is_custom:
+    if _is_custom and t58_groups:
         t58_block = r"\vspace{1em}" + "\n" + render_grouped_report_table(
             "Intermediate Stiffener Checks", t58_groups,
             headers=["girder", "check", "required", "provided", "status"],
@@ -1111,6 +1128,37 @@ def ch5_design_checks(checks_data, bridge, chart_paths=None, girder_details=None
                 group_rows.append([label, conn_type, section, area_str, rmin_str])
             cb_forces_groups.append((pair, group_rows))
 
+    # Read end diaphragm sections independently of the cross-bracing tables.
+    ed_section_groups = []
+    out = bridge.output_dict
+    for i in range(1, len(girder_entries)):
+        suffix = f".G{i}G{i+1}"
+        ed_type = out.get(KEY_MP_ED_TYPE + suffix)
+        if not ed_type:
+            continue
+        connection = ""
+        if ed_type == "Cross Bracing":
+            connection = out.get(KEY_MP_ED_BRACING_CONNECTION + suffix) or ""
+            sections = (
+                ("Diagonal", KEY_MP_ED_BRACING_SECTION_DESIGNATION, KEY_TD_ED_PROP_A, KEY_TD_ED_PROP_RV),
+                ("Top chord", KEY_MP_ED_TOP_CHORD_SECTION_DESIG, KEY_TD_ED_TOP_CHORD_PROP_A, KEY_TD_ED_TOP_CHORD_PROP_RV),
+                ("Bottom chord", KEY_MP_ED_BOTTOM_CHORD_SECTION_DESIG, KEY_TD_ED_BOTTOM_CHORD_PROP_A, KEY_TD_ED_BOTTOM_CHORD_PROP_RV),
+            )
+        else:
+            sections = ((ed_type, KEY_MP_ED_IS_SECTION, KEY_TD_ED_PROP_A, KEY_TD_ED_PROP_RV),)
+
+        rows = []
+        for label, section_key, area_key, radius_key in sections:
+            section = out.get(section_key + suffix)
+            if not section and label in ("Top chord", "Bottom chord"):
+                continue
+            area = out.get(area_key + suffix)
+            radius = out.get(radius_key + suffix)
+            rows.append([label, _tex(connection), _tex(section or ""),
+                         f"{float(area) * 100:.1f}" if area is not None else "",
+                         f"{float(radius) * 10:.1f}" if radius is not None else ""])
+        ed_section_groups.append((f"G{i}-G{i+1}", rows))
+
     # Generate Table 5.20(b) rows
     def get_status_str(slnd_str, limit):
         try:
@@ -1128,11 +1176,11 @@ def ch5_design_checks(checks_data, bridge, chart_paths=None, girder_details=None
             status_diag = get_status_str(slnd_diag, 250)
             
             kl_tc = bridge.get_cb_effective_length(pair, "chord")
-            slnd_tc = bridge.get_cb_slenderness(pair, "chord")
+            slnd_tc = bridge.get_cb_slenderness(pair, "top_chord", "compression")
             status_tc = get_status_str(slnd_tc, 250)
             
             kl_bc = bridge.get_cb_effective_length(pair, "chord")
-            slnd_bc = bridge.get_cb_slenderness(pair, "chord")
+            slnd_bc = bridge.get_cb_slenderness(pair, "bottom_chord", "tension")
             status_bc = get_status_str(slnd_bc, 400)
             
             top_chord_enabled = bridge.output_dict.get("member_properties.cross_bracing_details.top_chord", True)
@@ -1145,6 +1193,9 @@ def ch5_design_checks(checks_data, bridge, chart_paths=None, girder_details=None
             if bottom_chord_enabled:
                 group_rows.append(["Bottom chord", "T", kl_bc, slnd_bc, r"400 --- " + status_bc])
                 
+            for row in group_rows:
+                if row[3]:
+                    row[3] = f"{float(row[3]):.2f}"
             cb_slenderness_groups.append((pair, group_rows))
 
     # Generate Table 5.20(c) rows
@@ -1161,6 +1212,33 @@ def ch5_design_checks(checks_data, bridge, chart_paths=None, girder_details=None
             status   = bridge.get_cb_status(pair, member, ftype)
             group_rows.append([label, section, gov_lc, force_str, capacity, ur, status])
         cb_capacity_groups.append((pair, group_rows))
+
+    ed_capacity_groups = []
+    ed_forces = (bridge.output_dict.get("end_diaphragm_forces_dict") or {}).get("pairs") or {}
+    ed_designs = bridge.output_dict.get("end_diaphragm_design_results") or {}
+    for pair, forces in ed_forces.items():
+        rows = []
+        for member, runs in (ed_designs.get(pair) or {}).items():
+            prefix = "diag" if member == "diagonal" else "chord"
+            cases = [(forces.get(f"{prefix}_{kind}_kN"), kind) for kind in ("compression", "tension")]
+            demand, kind = max((case for case in cases if case[0] is not None),
+                               key=lambda case: abs(case[0]), default=(None, None))
+            if demand is None:
+                continue
+            result = _extract_osdag_summary(runs.get(kind) or {})
+            capacity = result.get("capacity_kN")
+            ur = abs(demand) / capacity if capacity is not None and capacity > 0 else None
+            status = "---"
+            if result.get("design_status") is False or (ur is not None and ur > 1.0):
+                status = r"\textcolor{red}{FAIL}"
+            elif ur is not None:
+                status = "PASS"
+            rows.append([member.replace("_", " ").capitalize(), _tex(result.get("section") or ""),
+                         _tex(forces.get(f"{prefix}_{kind}_gov_lc") or ""), f"{abs(demand):.3f}",
+                         str(capacity) if capacity is not None else "---",
+                         f"{ur:.3f}" if ur is not None else "---", status])
+        if rows:
+            ed_capacity_groups.append((pair, rows))
 
 
     # ── Deck slab design value helpers (Tables 5.17 a/b/c/e/g) ────────────────
@@ -1867,7 +1945,9 @@ End diaphragms at the supports transfer transverse loads to the bearings, restra
 \noindent
 \setlength{\tabcolsep}{6pt}
 """ + render_grouped_report_table(
-    "End Diaphragm --- Connection and Section Properties", cb_forces_groups,
+    "End Diaphragm --- Connection and Section Properties", ed_section_groups or [
+        ("Between Girders", [["", "", "", "", ""]])
+    ],
     headers=["panel", "member", "connection", "section", r"$A_g$ (mm²)", r"$r_{min}$ (mm)"],
     widths=[2.0, 2.0, 2.2, 2.5, 2.0, 2.0],
     align=["C", "L", "L", "C", "C", "C"], escape=False, longtable_min_rows=1) + r"""
@@ -1884,7 +1964,7 @@ End diaphragms at the supports transfer transverse loads to the bearings, restra
 \vspace{1em}
 
 """ + render_grouped_report_table(
-    "End Diaphragm Design --- Capacity Summary", cb_capacity_groups,
+    "End Diaphragm Design --- Capacity Summary", ed_capacity_groups or [("Between Girders", [["---"] * 7])],
     headers=["panel", "member", "section", "governing LC", "demand (kN)", "capacity (kN)", "UR", "status"],
     widths=[1.6, 2.2, 1.8, 2.35, 2.05, 2.15, 1.05, 1.45],
     align=["C", "L", "C", "C", "C", "C", "C", "C"], escape=False, longtable_min_rows=1) + r"""

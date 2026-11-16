@@ -582,10 +582,9 @@ class ReportDataBridge:
         val = self._cb_osdag(pair, member, force_type).get("efficiency")
         return f"{val}" if val is not None else ""
 
-    def get_cb_slenderness(self, pair: str, member: str) -> str:
-        """KL/r — same for tension and compression (geometry-based)."""
-        # Prefer compression result (slenderness is more meaningful there)
-        for ft in ("compression", "tension"):
+    def get_cb_slenderness(self, pair: str, member: str, force_type: str | None = None) -> str:
+        """KL/r for the requested force case, or compression-first by default."""
+        for ft in ((force_type,) if force_type is not None else ("compression", "tension")):
             val = self._cb_osdag(pair, member, ft).get("slenderness")
             if val is not None:
                 return f"{val}"
