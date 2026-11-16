@@ -295,9 +295,12 @@ def _update_typical_section_defaults(input_dict: dict) -> None:
 
     # --- Wearing Course sub-tab ---
     # Density and thickness match on_wearing_material_changed() in typical_section_details.py
+    from osdagbridge_core.bridge_components.super_structure.deck.geometry import (
+        WET_CONCRETE_DENSITY_kN_m3, BITUMINOUS_DENSITY_kN_m3,
+    )
     _update(KEY_WC_MATERIAL,  "Concrete")  # VALUES_WEARING_COAT_MATERIAL[0]
-    _update(KEY_WC_DENSITY,   24.0)        # kN/m³
-    _update(KEY_WC_THICKNESS, 50.0)        # mm
+    _update(KEY_WC_DENSITY,   f"{WET_CONCRETE_DENSITY_kN_m3:.1f}")        # kN/m³
+    _update(KEY_WC_THICKNESS, f"{50:.1f}")        # mm
 
 def _update_loading_tab_defaults(input_dict: dict) -> None:
     """Fill Loading tab keys that are None with schema defaults."""
